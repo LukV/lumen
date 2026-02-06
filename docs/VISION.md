@@ -12,9 +12,9 @@ Every major BI vendor now markets “talk to your data” features. Most of them
 
 Lumen is a conversational analytics notebook. It connects to a data source and lets analysts explore their data through natural language. Ask a question, get a visualization and a narrative. Refine, drill down, change direction — all in conversation. Each question-and-answer pair becomes a cell in a notebook that is reproducible, auditable, and shareable.
 
-Lumen is not a dashboard builder, not a BI platform, and not a chatbot bolted onto a chart library. It is the analyst’s thinking partner: a tool for the exploration and sensemaking that happens before the dashboard. It sits at the crossroads of conversational interfaces and Jupyter Notebooks. Jupyter became hugely successful because it preserved the analyst’s sense of control and reproducibility while making exploration fluid. Lumen aims for the same balance — with natural language as the primary interface.
+Lumen is not a dashboard builder, not a BI platform, and not a chatbot bolted onto a chart library. It is **the analyst’s thinking partner**: a tool for the exploration and sensemaking that happens before the dashboard. It sits at the crossroads of conversational interfaces and Jupyter Notebooks. Jupyter became hugely successful because it preserved the analyst’s sense of control and reproducibility while making exploration fluid. Lumen aims for the same balance — with natural language as the primary interface.
 
-“Lumen is a Jupyter Notebook you can talk to.”
+_“Lumen is a Jupyter Notebook you can talk to.”_
 
 ## WHO IT IS FOR
 
