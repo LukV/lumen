@@ -1,0 +1,54 @@
+[project]
+name = "lumen"
+version = "0.1.0"
+description = "Conversational analytics notebook"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "asyncpg>=0.30",
+    "anthropic>=0.42",
+    "pydantic>=2.10",
+    "pyyaml>=6.0",
+    "typer>=0.15",
+    "rich>=13.9",
+    "sse-starlette>=2.2",
+    "pglast>=7",
+    "numpy>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "httpx>=0.28",
+]
+
+[project.scripts]
+lumen = "lumen.cli:main"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "SIM"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
