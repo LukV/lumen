@@ -53,6 +53,26 @@ def test_spec_has_theme_applied() -> None:
     assert "config" in spec
 
 
+def test_time_plus_two_measures_gives_stacked_area() -> None:
+    schema = _make_schema([
+        ("month", "date", "time_dimension"),
+        ("revenue", "numeric", "measure_candidate"),
+        ("cost", "numeric", "measure_candidate"),
+    ])
+    spec = auto_detect_chart(["month", "revenue", "cost"], ["date", "float", "float"], schema)
+    assert spec["mark"]["type"] == "area"
+    assert spec["encoding"]["x"]["field"] == "month"
+    assert spec["encoding"]["color"]["field"] == "metric"
+    assert "transform" in spec
+
+
+def test_kpi_uses_text_mark() -> None:
+    schema = _make_schema([("total", "numeric", "measure_candidate")])
+    spec = auto_detect_chart(["total"], ["float"], schema)
+    assert spec["mark"]["type"] == "text"
+    assert spec["mark"]["fontSize"] == 48
+
+
 def test_empty_schema_fallback() -> None:
     schema = EnrichedSchema()
     spec = auto_detect_chart(["a", "b"], ["str", "int"], schema)

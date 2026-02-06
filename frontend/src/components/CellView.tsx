@@ -11,83 +11,61 @@ interface CellViewProps {
 
 export default function CellView({ cell, onCellUpdate }: CellViewProps) {
   const [showCode, setShowCode] = useState(false);
+  const [hoveredDatum, setHoveredDatum] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   const hasErrors = cell.result?.diagnostics?.some(
     (d) => d.severity === "error"
   );
+  const hasData = cell.result && cell.result.data.length > 0;
+  const emptyResult =
+    cell.result && cell.result.row_count === 0 && !hasErrors;
 
   return (
-    <div
-      style={{
-        border: "1px solid #e0e0e0",
-        borderRadius: "8px",
-        padding: "20px",
-        marginBottom: "16px",
-        backgroundColor: "#fff",
-      }}
-    >
+    <div className="cell">
       {/* Question header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-        <h3
-          style={{
-            fontSize: "15px",
-            fontWeight: 600,
-            color: "#1a1a1a",
-            margin: 0,
-            flex: 1,
-          }}
-        >
-          {cell.question}
-        </h3>
+      <div className="cell__header">
+        <h3 className="cell__question">{cell.question}</h3>
         {cell.sql?.edited_by_user && (
-          <span
-            style={{
-              fontSize: "10px",
-              fontWeight: 600,
-              color: "#3b5998",
-              backgroundColor: "#e8f0fe",
-              padding: "2px 8px",
-              borderRadius: "10px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            edited
-          </span>
+          <span className="cell__badge">edited</span>
         )}
       </div>
 
       {/* Error banner */}
       {hasErrors && (
-        <div
-          style={{
-            padding: "10px 14px",
-            backgroundColor: "#fff5f5",
-            border: "1px solid #fcc",
-            borderRadius: "6px",
-            color: "#c33",
-            fontSize: "13px",
-            marginBottom: "16px",
-          }}
-        >
-          {cell.result?.diagnostics
-            ?.filter((d) => d.severity === "error")
-            .map((d, i) => (
-              <div key={i}>
-                {d.message}
-                {d.hint && (
-                  <span style={{ color: "#999", marginLeft: "8px" }}>
-                    Hint: {d.hint}
-                  </span>
-                )}
-              </div>
-            ))}
+        <div className="error-banner">
+          <div className="error-banner__content">
+            {cell.result?.diagnostics
+              ?.filter((d) => d.severity === "error")
+              .map((d, i) => (
+                <div key={i}>
+                  {d.message}
+                  {d.hint && (
+                    <span className="error-banner__hint">Hint: {d.hint}</span>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty results */}
+      {emptyResult && (
+        <div className="cell__empty-results">
+          Query returned no results. Try broadening your filters.
         </div>
       )}
 
       {/* Chart */}
-      {cell.chart && cell.result && cell.result.data.length > 0 && (
-        <div style={{ marginBottom: "16px" }}>
-          <ChartRenderer spec={cell.chart.spec} data={cell.result.data} />
+      {cell.chart && hasData && (
+        <div className="cell__chart">
+          <ChartRenderer
+            spec={cell.chart.spec}
+            data={cell.result!.data}
+            onHoverData={setHoveredDatum}
+          />
         </div>
       )}
 
@@ -96,23 +74,16 @@ export default function CellView({ cell, onCellUpdate }: CellViewProps) {
         <NarrativeView
           text={cell.narrative.text}
           dataReferences={cell.narrative.data_references}
+          highlightedDatum={hoveredDatum}
         />
       )}
 
       {/* Code toggle */}
       {cell.sql && (
-        <div style={{ marginTop: "12px" }}>
+        <div className="cell__code-toggle">
           <button
             onClick={() => setShowCode(!showCode)}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#666",
-              fontSize: "12px",
-              cursor: "pointer",
-              padding: "4px 0",
-              fontFamily: "Inter, system-ui, sans-serif",
-            }}
+            className="cell__code-toggle-btn"
           >
             {showCode ? "Hide code" : "Show code"}
           </button>
@@ -121,15 +92,7 @@ export default function CellView({ cell, onCellUpdate }: CellViewProps) {
       )}
 
       {/* Footer */}
-      <div
-        style={{
-          display: "flex",
-          gap: "16px",
-          marginTop: "12px",
-          fontSize: "11px",
-          color: "#999",
-        }}
-      >
+      <div className="cell__footer">
         {cell.result && (
           <>
             <span>{cell.result.row_count} rows</span>

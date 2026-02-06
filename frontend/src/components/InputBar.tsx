@@ -1,13 +1,68 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+interface SchemaData {
+  database: string;
+  tables: {
+    name: string;
+    columns: { name: string; role: string }[];
+  }[];
+}
 
 interface InputBarProps {
   onAsk: (question: string) => void;
   disabled: boolean;
   parentCellId?: string | null;
+  schema?: SchemaData | null;
 }
 
-export default function InputBar({ onAsk, disabled, parentCellId }: InputBarProps) {
+function buildPlaceholders(schema: SchemaData): string[] {
+  const hints: string[] = [];
+  for (const table of schema.tables) {
+    const measures = table.columns.filter(
+      (c) => c.role === "measure_candidate"
+    );
+    const timeCols = table.columns.filter((c) => c.role === "time_dimension");
+    const cats = table.columns.filter((c) => c.role === "categorical");
+
+    if (timeCols.length > 0 && measures.length > 0) {
+      hints.push(
+        `Show monthly ${measures[0].name} trend from ${table.name}...`
+      );
+    }
+    if (cats.length > 0 && measures.length > 0) {
+      hints.push(
+        `Top 10 ${cats[0].name} by ${measures[0].name} in ${table.name}...`
+      );
+    }
+    if (hints.length >= 4) break;
+  }
+  return hints.length > 0 ? hints : ["Ask a question about your data..."];
+}
+
+export default function InputBar({
+  onAsk,
+  disabled,
+  parentCellId,
+  schema,
+}: InputBarProps) {
   const [question, setQuestion] = useState("");
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  const placeholders =
+    parentCellId
+      ? ["Refine this analysis..."]
+      : schema
+        ? buildPlaceholders(schema)
+        : ["Ask a question about your data..."];
+
+  // Rotate placeholders every 4s
+  useEffect(() => {
+    if (placeholders.length <= 1) return;
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [placeholders.length]);
 
   const handleSubmit = () => {
     const trimmed = question.trim();
@@ -16,26 +71,9 @@ export default function InputBar({ onAsk, disabled, parentCellId }: InputBarProp
     setQuestion("");
   };
 
-  const placeholder = parentCellId
-    ? "Refine this analysis..."
-    : "Ask a question about your data...";
-
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: "12px 16px",
-        backgroundColor: "#fff",
-        borderTop: "1px solid #e0e0e0",
-        display: "flex",
-        gap: "8px",
-        justifyContent: "center",
-      }}
-    >
-      <div style={{ display: "flex", gap: "8px", maxWidth: "868px", width: "100%" }}>
+    <div className="input-bar">
+      <div className="input-bar__inner">
         <input
           type="text"
           value={question}
@@ -43,32 +81,14 @@ export default function InputBar({ onAsk, disabled, parentCellId }: InputBarProp
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSubmit();
           }}
-          placeholder={placeholder}
+          placeholder={placeholders[placeholderIndex % placeholders.length]}
           disabled={disabled}
-          style={{
-            flex: 1,
-            padding: "10px 14px",
-            fontSize: "14px",
-            border: "1px solid #d0d0d0",
-            borderRadius: "8px",
-            outline: "none",
-            fontFamily: "Inter, system-ui, sans-serif",
-          }}
+          className="input-bar__input"
         />
         <button
           onClick={handleSubmit}
           disabled={disabled || !question.trim()}
-          style={{
-            padding: "10px 20px",
-            fontSize: "14px",
-            fontWeight: 600,
-            color: "#fff",
-            backgroundColor: disabled || !question.trim() ? "#a0a0a0" : "#3b5998",
-            border: "none",
-            borderRadius: "8px",
-            cursor: disabled || !question.trim() ? "not-allowed" : "pointer",
-            fontFamily: "Inter, system-ui, sans-serif",
-          }}
+          className="btn-primary"
         >
           Ask
         </button>

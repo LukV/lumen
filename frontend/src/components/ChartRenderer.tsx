@@ -1,9 +1,10 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ReactNode, useCallback, useMemo } from "react";
 import { VegaLite } from "react-vega";
 
 interface ChartRendererProps {
   spec: Record<string, unknown>;
   data: Record<string, unknown>[];
+  onHoverData?: (datum: Record<string, unknown> | null) => void;
 }
 
 interface ErrorBoundaryState {
@@ -27,16 +28,7 @@ class ChartErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div
-          style={{
-            padding: "12px 16px",
-            backgroundColor: "#fff5f5",
-            border: "1px solid #fcc",
-            borderRadius: "6px",
-            color: "#c33",
-            fontSize: "13px",
-          }}
-        >
+        <div className="chart-error">
           Chart rendering error: {this.state.error}
         </div>
       );
@@ -45,20 +37,63 @@ class ChartErrorBoundary extends Component<
   }
 }
 
-export default function ChartRenderer({ spec, data }: ChartRendererProps) {
-  // Inject data into spec
-  const fullSpec = {
-    ...spec,
-    data: { values: data },
-  };
+export default function ChartRenderer({
+  spec,
+  data,
+  onHoverData,
+}: ChartRendererProps) {
+  // Inject data and hover selection into spec
+  const fullSpec = useMemo(() => {
+    const s: Record<string, unknown> = {
+      ...spec,
+      data: { values: data },
+    };
+    // Add selection param for hover if callback provided
+    if (onHoverData) {
+      const existingParams = (s.params as unknown[]) ?? [];
+      s.params = [
+        ...existingParams,
+        {
+          name: "hover",
+          select: { type: "point", on: "pointerover", clear: "pointerout" },
+        },
+      ];
+    }
+    return s;
+  }, [spec, data, onHoverData]);
+
+  const handleHoverSignal = useCallback(
+    (_name: string, value: unknown) => {
+      if (!onHoverData) return;
+      // Vega selection signal value is an object with the selected datum fields
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        const obj = value as Record<string, unknown>;
+        // Empty object means no selection (pointerout)
+        if (Object.keys(obj).length === 0) {
+          onHoverData(null);
+        } else {
+          onHoverData(obj);
+        }
+      } else {
+        onHoverData(null);
+      }
+    },
+    [onHoverData]
+  );
+
+  const signalListeners = useMemo(() => {
+    if (!onHoverData) return undefined;
+    return { hover: handleHoverSignal };
+  }, [onHoverData, handleHoverSignal]);
 
   return (
     <ChartErrorBoundary>
-      <div style={{ width: "100%" }}>
+      <div className="chart-container">
         <VegaLite
           spec={fullSpec as never}
           actions={false}
           style={{ width: "100%" }}
+          signalListeners={signalListeners}
         />
       </div>
     </ChartErrorBoundary>

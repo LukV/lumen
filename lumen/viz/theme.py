@@ -28,6 +28,8 @@ LUMEN_THEME: dict[str, Any] = {
             "gridColor": "#e0e0e0",
             "domainColor": "#ccc",
             "tickColor": "#ccc",
+            "labelLimit": 150,
+            "titlePadding": 12,
         },
         "legend": {
             "labelFont": "Inter, system-ui, sans-serif",
@@ -43,12 +45,25 @@ LUMEN_THEME: dict[str, Any] = {
         "bar": {
             "cornerRadiusEnd": 3,
         },
+        "line": {
+            "strokeWidth": 2,
+            "point": {"size": 40},
+        },
+        "point": {
+            "size": 60,
+            "opacity": 0.7,
+        },
+        "area": {
+            "opacity": 0.7,
+            "line": True,
+        },
         "range": {
             "category": LUMEN_PALETTE,
         },
         "view": {
             "strokeWidth": 0,
         },
+        "padding": {"row": 10, "column": 10},
         "background": "transparent",
     },
 }

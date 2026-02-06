@@ -70,8 +70,14 @@ async def _startup() -> None:
 
 
 @app.get("/api/health")
-async def health() -> dict[str, bool]:
-    return {"ok": True}
+async def health() -> dict[str, Any]:
+    config = load_config()
+    result: dict[str, Any] = {"ok": True}
+    if config.active_connection:
+        result["connection_name"] = config.active_connection
+    if _schema_ctx is not None:
+        result["database"] = _schema_ctx.enriched.database
+    return result
 
 
 @app.get("/api/schema")

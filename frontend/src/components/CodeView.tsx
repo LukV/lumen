@@ -94,24 +94,14 @@ export default function CodeView({ cell, onCellUpdate }: CodeViewProps) {
   ];
 
   return (
-    <div style={{ marginTop: "8px" }}>
+    <div className="code-view">
       {/* Tab bar */}
-      <div style={{ display: "flex", gap: "0", borderBottom: "1px solid #e0e0e0" }}>
+      <div className="code-view__tabs">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: "6px 16px",
-              fontSize: "12px",
-              fontWeight: activeTab === tab.key ? 600 : 400,
-              color: activeTab === tab.key ? "#3b5998" : "#666",
-              background: "none",
-              border: "none",
-              borderBottom: activeTab === tab.key ? "2px solid #3b5998" : "2px solid transparent",
-              cursor: "pointer",
-              fontFamily: "Inter, system-ui, sans-serif",
-            }}
+            className={`code-view__tab ${activeTab === tab.key ? "code-view__tab--active" : ""}`}
           >
             {tab.label}
           </button>
@@ -119,80 +109,39 @@ export default function CodeView({ cell, onCellUpdate }: CodeViewProps) {
       </div>
 
       {/* Tab content */}
-      <div style={{ marginTop: "8px" }}>
+      <div className="code-view__content">
         {activeTab === "sql" && (
           <div>
             <textarea
               value={editedSql}
               onChange={(e) => setEditedSql(e.target.value)}
               disabled={isRunning}
-              style={{
-                width: "100%",
-                minHeight: "120px",
-                padding: "12px",
-                fontSize: "12px",
-                fontFamily: "'SF Mono', 'Fira Code', monospace",
-                lineHeight: "1.5",
-                border: "1px solid #d0d0d0",
-                borderRadius: "6px",
-                backgroundColor: "#f8f8f8",
-                resize: "vertical",
-                boxSizing: "border-box",
-              }}
+              className="code-view__textarea"
             />
-            <div style={{ display: "flex", gap: "8px", marginTop: "8px", alignItems: "center" }}>
+            <div className="code-view__actions">
               <button
                 onClick={handleRun}
                 disabled={!sqlChanged || isRunning}
-                style={{
-                  padding: "6px 16px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  color: "#fff",
-                  backgroundColor: !sqlChanged || isRunning ? "#a0a0a0" : "#3b5998",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: !sqlChanged || isRunning ? "not-allowed" : "pointer",
-                  fontFamily: "Inter, system-ui, sans-serif",
-                }}
+                className="btn-run"
               >
                 Run
               </button>
               {runStage && <StageIndicator stage={runStage} />}
               {runError && (
-                <span style={{ fontSize: "12px", color: "#c33" }}>{runError}</span>
+                <span className="code-view__run-error">{runError}</span>
               )}
             </div>
           </div>
         )}
 
         {activeTab === "chart" && (
-          <pre
-            style={{
-              backgroundColor: "#f5f5f5",
-              padding: "12px",
-              borderRadius: "6px",
-              fontSize: "11px",
-              overflow: "auto",
-              maxHeight: "300px",
-              fontFamily: "'SF Mono', 'Fira Code', monospace",
-              lineHeight: "1.5",
-            }}
-          >
+          <pre className="code-view__pre">
             {cell.chart ? JSON.stringify(cell.chart.spec, null, 2) : "No chart spec"}
           </pre>
         )}
 
         {activeTab === "reasoning" && (
-          <p
-            style={{
-              fontSize: "13px",
-              lineHeight: "1.6",
-              color: "#555",
-              padding: "8px 0",
-              margin: 0,
-            }}
-          >
+          <p className="code-view__reasoning">
             {cell.metadata.reasoning || "No reasoning available"}
           </p>
         )}

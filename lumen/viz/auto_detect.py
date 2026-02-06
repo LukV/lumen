@@ -61,7 +61,12 @@ def auto_detect_chart(
         spec = _kpi_spec(measure_cols[0])
         return apply_theme(spec)
 
-    # Rule 2: Time + measures → line
+    # Rule 2a: Time + 2+ measures → stacked area (fold transform)
+    if time_cols and len(measure_cols) >= 2:
+        spec = _stacked_area_spec(time_cols[0], measure_cols)
+        return apply_theme(spec)
+
+    # Rule 2b: Time + 1 measure → line
     if time_cols and measure_cols:
         spec = _line_spec(time_cols[0], measure_cols[0])
         return apply_theme(spec)
@@ -153,12 +158,31 @@ def _scatter_spec(x: str, y: str) -> dict[str, Any]:
     }
 
 
-def _kpi_spec(field: str) -> dict[str, Any]:
+def _stacked_area_spec(time_col: str, measure_cols: list[str]) -> dict[str, Any]:
     return {
-        "mark": {"type": "bar", "cornerRadiusEnd": 3},
+        "transform": [{"fold": measure_cols, "as": ["metric", "value"]}],
+        "mark": {"type": "area", "opacity": 0.7, "line": True},
         "encoding": {
-            "x": {"field": field, "type": "quantitative"},
+            "x": {"field": time_col, "type": "temporal"},
+            "y": {"field": "value", "type": "quantitative", "stack": "zero"},
+            "color": {"field": "metric", "type": "nominal"},
         },
         "width": "container",
-        "height": 60,
+        "height": 300,
+    }
+
+
+def _kpi_spec(field: str) -> dict[str, Any]:
+    return {
+        "mark": {
+            "type": "text",
+            "fontSize": 48,
+            "fontWeight": 700,
+            "color": "#3b5998",
+        },
+        "encoding": {
+            "text": {"field": field, "type": "quantitative", "format": ",.2~f"},
+        },
+        "width": "container",
+        "height": 80,
     }
