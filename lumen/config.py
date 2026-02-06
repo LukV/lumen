@@ -39,11 +39,16 @@ def _config_path() -> Path:
     return _config_dir() / "config.json"
 
 
+def notebooks_dir() -> Path:
+    """Return the notebooks directory path."""
+    return _config_dir() / "notebooks"
+
+
 def ensure_dirs() -> None:
     """Create required Lumen directories."""
     base = _config_dir()
     base.mkdir(exist_ok=True)
-    (base / "notebooks").mkdir(exist_ok=True)
+    notebooks_dir().mkdir(exist_ok=True)
     (base / "projects").mkdir(exist_ok=True)
 
 

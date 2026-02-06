@@ -95,7 +95,11 @@ def start(
     no_browser: bool = typer.Option(False, "--no-browser", help="Don't open browser"),
 ) -> None:
     """Start the Lumen server."""
+    import logging
+
     import uvicorn
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
     config = load_config()
     if not config.active_connection:
