@@ -3,6 +3,10 @@ name = "lumen"
 version = "0.1.0"
 description = "Conversational analytics notebook"
 readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Luk Verhelst", email = "luk.verhelst@gmail.com" },
+]
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115",

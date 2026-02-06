@@ -1282,7 +1282,8 @@ build-backend = "hatchling.build"
 
 These are out of scope for Release Tufte but should not be *prevented* by v1 architecture decisions:
 
-- **Additional data sources** — Snowflake, BigQuery, DuckDB with local Parquet/CSV. The `SchemaContext` and `runner.py` are the abstraction boundary; adding a source type means implementing a new introspector and executor behind the same interface.
+- **Support multiple projects** — Support connections to mutiple databases and their respective configurations. Allow the user to switch between them, resulting in a new session.
+- **Additional data sources** — MotherDuck, DuckDB with local Parquet/CSV. The `SchemaContext` and `runner.py` are the abstraction boundary; adding a source type means implementing a new introspector and executor behind the same interface.
 - **What-if as a headline feature** — all five techniques from DuckBook, with full explainability.
 - **Local model support** — Ollama integration. The `anthropic` client is isolated in `agent/`; swapping to an Ollama client means implementing the same tool-use interface.
 - **Collaboration and sharing** — notebook export (HTML, PDF), team sharing.
