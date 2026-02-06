@@ -9,8 +9,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from lumen.config import ConnectionConfig, ensure_dirs, load_config, save_config
-from lumen.schema.cache import save_cache
+from lumen.config import ConnectionConfig, ensure_dirs, load_config, project_dir, save_config
+from lumen.schema.augmenter import augment_schema
+from lumen.schema.cache import is_stale, save_cache
 from lumen.schema.context import SchemaContext, compute_hash
 from lumen.schema.enricher import enrich
 from lumen.schema.introspector import introspect
@@ -45,8 +46,14 @@ async def _connect(dsn: str, name: str, schema_name: str) -> None:
     snapshot = result.data
     enriched = enrich(snapshot)
 
-    ctx = SchemaContext(enriched=enriched)
+    # Augment with external documentation
+    proj_dir = project_dir(name)
+    augmented_docs = augment_schema(proj_dir, enriched)
+    ctx = SchemaContext(enriched=enriched, augmented_docs=augmented_docs or None)
     ctx.hash = compute_hash(ctx)
+
+    # Check staleness against cached version
+    stale = is_stale(name, ctx.hash)
 
     # Save config
     config = load_config()
@@ -59,7 +66,15 @@ async def _connect(dsn: str, name: str, schema_name: str) -> None:
 
     # Print summary
     console.print(f"\n[green]Connected to [bold]{enriched.database}[/bold][/green]")
-    console.print(f"Schema: {enriched.schema_name} | Hash: {ctx.hash[:20]}...")
+    status_label = "[yellow]schema changed[/yellow]" if stale else "[dim]unchanged[/dim]"
+    console.print(f"Schema: {enriched.schema_name} | Hash: {ctx.hash[:20]}... | {status_label}")
+
+    if augmented_docs:
+        # Count augmented tables/columns
+        doc_lines = augmented_docs.split("\n")
+        table_count = sum(1 for line in doc_lines if line.startswith("## Table:"))
+        col_count = sum(1 for line in doc_lines if line.startswith("- "))
+        console.print(f"[cyan]Augmented docs:[/cyan] {table_count} tables, {col_count} columns documented")
 
     for table in enriched.tables:
         t = Table(title=f"{table.name} (~{table.row_count} rows)", show_lines=False)

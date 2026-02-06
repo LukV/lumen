@@ -44,6 +44,16 @@ def notebooks_dir() -> Path:
     return _config_dir() / "notebooks"
 
 
+def projects_dir() -> Path:
+    """Return the projects directory path."""
+    return _config_dir() / "projects"
+
+
+def project_dir(name: str) -> Path:
+    """Return the directory for a specific project."""
+    return projects_dir() / name
+
+
 def ensure_dirs() -> None:
     """Create required Lumen directories."""
     base = _config_dir()
