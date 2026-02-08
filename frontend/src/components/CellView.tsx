@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Cell } from "../types/cell";
+import { API_BASE } from "../config";
 import ChartRenderer from "./ChartRenderer";
 import CodeView from "./CodeView";
 import NarrativeView from "./NarrativeView";
@@ -7,15 +8,19 @@ import NarrativeView from "./NarrativeView";
 interface CellViewProps {
   cell: Cell;
   onCellUpdate: (updated: Cell) => void;
+  onCellDelete: (cellId: string) => void;
 }
 
-export default function CellView({ cell, onCellUpdate }: CellViewProps) {
+export default function CellView({ cell, onCellUpdate, onCellDelete }: CellViewProps) {
   const [showCode, setShowCode] = useState(false);
   const [showCaveats, setShowCaveats] = useState(false);
   const [hoveredDatum, setHoveredDatum] = useState<Record<
     string,
     unknown
   > | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const hasErrors = cell.result?.diagnostics?.some(
     (d) => d.severity === "error"
@@ -24,17 +29,90 @@ export default function CellView({ cell, onCellUpdate }: CellViewProps) {
   const emptyResult =
     cell.result && cell.result.row_count === 0 && !hasErrors;
 
+  const displayTitle = cell.title || cell.question;
+
+  const startEditing = () => {
+    setTitleDraft(displayTitle);
+    setEditingTitle(true);
+    setTimeout(() => titleInputRef.current?.select(), 0);
+  };
+
+  const commitTitle = async () => {
+    setEditingTitle(false);
+    const newTitle = titleDraft.trim();
+    if (newTitle === cell.question) {
+      // Reset to default (empty title means use question)
+      if (cell.title === "") return;
+      try {
+        await fetch(`${API_BASE}/api/cells/${cell.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "" }),
+        });
+        onCellUpdate({ ...cell, title: "" });
+      } catch { /* ignore */ }
+      return;
+    }
+    if (newTitle && newTitle !== cell.title) {
+      try {
+        await fetch(`${API_BASE}/api/cells/${cell.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newTitle }),
+        });
+        onCellUpdate({ ...cell, title: newTitle });
+      } catch { /* ignore */ }
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitTitle();
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
+  };
+
   return (
     <div className="cell">
       {/* Question header */}
       <div className="cell__header">
-        <h3 className="cell__question">{cell.question}</h3>
+        {editingTitle ? (
+          <input
+            ref={titleInputRef}
+            className="cell__title-input"
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={handleTitleKeyDown}
+          />
+        ) : (
+          <h3
+            className="cell__question"
+            onDoubleClick={startEditing}
+            title="Double-click to edit title"
+          >
+            {displayTitle}
+          </h3>
+        )}
         {cell.metadata.whatif && (
           <span className="cell__badge cell__badge--projection">projection</span>
         )}
         {cell.sql?.edited_by_user && (
           <span className="cell__badge">edited</span>
         )}
+        <button
+          className="cell__delete-btn"
+          onClick={() => onCellDelete(cell.id)}
+          aria-label="Remove cell"
+        >
+          &times;
+        </button>
       </div>
 
       {/* Error banner */}

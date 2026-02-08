@@ -65,6 +65,7 @@ export interface Cell {
   id: string;
   created_at: string;
   question: string;
+  title: string;
   context: CellContext;
   sql: CellSQL | null;
   result: CellResult | null;

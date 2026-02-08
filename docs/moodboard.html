@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumen — Visual Mood Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F6F4F0;
+    --bg-warm: #F0EDE7;
+    --bg-card: #FAFAF8;
+    --text-primary: #2C2A27;
+    --text-secondary: #7A756D;
+    --text-tertiary: #A39E95;
+    --accent: #4A2D4F;
+    --accent-light: #5E3A64;
+    --accent-muted: rgba(74, 45, 79, 0.08);
+    --accent-border: rgba(74, 45, 79, 0.15);
+    --border: rgba(44, 42, 39, 0.08);
+    --border-strong: rgba(44, 42, 39, 0.14);
+
+    /* FT-inspired data palette */
+    --data-1: #4A2D4F;
+    --data-2: #C2876E;
+    --data-3: #6B8F8A;
+    --data-4: #B8A44C;
+    --data-5: #8C7B6B;
+    --data-6: #A3667E;
+
+    --font-body: 'DM Sans', system-ui, sans-serif;
+    --font-editorial: 'Source Serif 4', Georgia, serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 64px 48px 80px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--border-strong);
+    margin-bottom: 56px;
+  }
+
+  .logo-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-mark {
+    width: 40px;
+    height: 40px;
+    position: relative;
+  }
+
+  .logo-mark svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .logo-wordmark {
+    font-family: var(--font-editorial);
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+  }
+
+  .header-meta {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ── Section titles ── */
+  .section-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 20px;
+  }
+
+  /* ── Grid system ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+  }
+
+  .grid-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 20px;
+  }
+
+  .grid-5 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+  }
+
+  .row + .row {
+    margin-top: 56px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+  }
+
+  .card-flush {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  /* ── Tone keywords ── */
+  .tone-word {
+    font-family: var(--font-editorial);
+    font-size: 22px;
+    font-weight: 300;
+    color: var(--text-primary);
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .tone-word:last-child {
+    border-bottom: none;
+  }
+
+  .tone-tag {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Color swatches ── */
+  .swatch-block {
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .swatch-color {
+    height: 72px;
+    width: 100%;
+  }
+
+  .swatch-info {
+    background: var(--bg-card);
+    padding: 12px 14px;
+  }
+
+  .swatch-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+  }
+
+  .swatch-hex {
+    font-size: 11px;
+    font-family: 'DM Sans', monospace;
+    color: var(--text-tertiary);
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Data palette ── */
+  .data-palette {
+    display: flex;
+    gap: 2px;
+    border-radius: 4px;
+    overflow: hidden;
+    height: 48px;
+  }
+
+  .data-palette-swatch {
+    flex: 1;
+    position: relative;
+  }
+
+  .data-palette-label {
+    display: flex;
+    gap: 2px;
+    margin-top: 8px;
+  }
+
+  .data-palette-label span {
+    flex: 1;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Typography specimen ── */
+  .type-specimen {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .type-family-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .type-large {
+    font-size: 36px;
+    font-weight: 300;
+    line-height: 1.2;
+    color: var(--text-primary);
+  }
+
+  .type-body {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    max-width: 48ch;
+  }
+
+  .type-small {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+  }
+
+  .type-serif { font-family: var(--font-editorial); }
+  .type-sans { font-family: var(--font-body); }
+
+  /* ── Chart mock ── */
+  .chart-area {
+    padding: 28px;
+  }
+
+  .chart-title {
+    font-family: var(--font-editorial);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .chart-subtitle {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-bottom: 24px;
+  }
+
+  .chart-container {
+    position: relative;
+    height: 180px;
+  }
+
+  .chart-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .chart-axis-label {
+    font-size: 10px;
+    fill: var(--text-tertiary);
+    font-family: var(--font-body);
+  }
+
+  .chart-source {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Narrative mock ── */
+  .narrative-block {
+    padding: 28px;
+    border-left: 2px solid var(--accent-border);
+  }
+
+  .narrative-block p {
+    font-family: var(--font-editorial);
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--text-primary);
+    font-weight: 400;
+  }
+
+  .narrative-block .highlight {
+    background: var(--accent-muted);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .narrative-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 12px;
+  }
+
+  /* ── Spacing specimen ── */
+  .spacing-demo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .spacing-bar {
+    height: 6px;
+    border-radius: 2px;
+    background: var(--accent-muted);
+    border: 1px solid var(--accent-border);
+  }
+
+  .spacing-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .spacing-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    min-width: 32px;
+    font-family: 'DM Sans', monospace;
+  }
+
+  /* ── Principles strip ── */
+  .principle-item {
+    padding: 24px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .principle-item:last-child {
+    border-bottom: none;
+  }
+
+  .principle-title {
+    font-family: var(--font-editorial);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .principle-desc {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+
+  /* ── Logo showcase ── */
+  .logo-showcase {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 48px;
+    padding: 48px 32px;
+  }
+
+  .logo-variant {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-variant-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+
+  .logo-large .logo-mark-svg {
+    width: 56px;
+    height: 56px;
+  }
+
+  .logo-large .logo-wordmark-text {
+    font-family: var(--font-editorial);
+    font-size: 32px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+  }
+
+  .logo-on-dark {
+    background: var(--text-primary);
+    border-radius: 6px;
+    padding: 32px 48px;
+  }
+
+  .logo-on-dark .logo-wordmark-text {
+    color: var(--bg);
+  }
+
+  .logo-inline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* ── Interaction states ── */
+  .state-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .state-chip {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 3px;
+    letter-spacing: 0.01em;
+  }
+
+  .state-default {
+    background: var(--bg-warm);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-strong);
+  }
+
+  .state-hover {
+    background: var(--accent-muted);
+    color: var(--accent);
+    border: 1px solid var(--accent-border);
+  }
+
+  .state-active {
+    background: var(--accent);
+    color: #F6F4F0;
+    border: 1px solid var(--accent);
+  }
+
+  .state-label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    min-width: 52px;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: var(--border-strong);
+    margin: 56px 0;
+  }
+
+  /* ── North Star ── */
+  .north-star {
+    text-align: center;
+    padding: 48px 0 0;
+  }
+
+  .north-star blockquote {
+    font-family: var(--font-editorial);
+    font-size: 20px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .north-star cite {
+    display: block;
+    margin-top: 16px;
+    font-style: normal;
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+
+  /* ── Avoid strip ── */
+  .avoid-list {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .avoid-tag {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    padding: 5px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    text-decoration: line-through;
+    text-decoration-color: rgba(44,42,39,0.25);
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo-group">
+      <div class="logo-mark">
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="8" width="3" height="24" rx="1.5" fill="#4A2D4F"/>
+          <rect x="12" y="14" width="3" height="18" rx="1.5" fill="#4A2D4F" opacity="0.7"/>
+          <rect x="20" y="6" width="3" height="26" rx="1.5" fill="#4A2D4F" opacity="0.85"/>
+          <rect x="28" y="11" width="3" height="21" rx="1.5" fill="#4A2D4F" opacity="0.55"/>
+          <rect x="36" y="18" width="3" height="14" rx="1.5" fill="#4A2D4F" opacity="0.35"/>
+          <line x1="2" y1="33.5" x2="40" y2="33.5" stroke="#4A2D4F" stroke-width="1" opacity="0.3"/>
+        </svg>
+      </div>
+      <span class="logo-wordmark">Lumen</span>
+    </div>
+    <span class="header-meta">Visual Mood Board · Release Tufte</span>
+  </header>
+
+  <!-- Row 1: Logo + Tone -->
+  <div class="row grid-2">
+    <!-- Logo Showcase -->
+    <div>
+      <div class="section-label">Logo</div>
+      <div class="card card-flush">
+        <div class="logo-showcase" style="flex-direction: column; gap: 36px;">
+          <!-- Light variant -->
+          <div class="logo-variant">
+            <div class="logo-inline">
+              <svg width="44" height="44" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="4" y="8" width="3" height="24" rx="1.5" fill="#4A2D4F"/>
+                <rect x="12" y="14" width="3" height="18" rx="1.5" fill="#4A2D4F" opacity="0.7"/>
+                <rect x="20" y="6" width="3" height="26" rx="1.5" fill="#4A2D4F" opacity="0.85"/>
+                <rect x="28" y="11" width="3" height="21" rx="1.5" fill="#4A2D4F" opacity="0.55"/>
+                <rect x="36" y="18" width="3" height="14" rx="1.5" fill="#4A2D4F" opacity="0.35"/>
+                <line x1="2" y1="33.5" x2="40" y2="33.5" stroke="#4A2D4F" stroke-width="1" opacity="0.3"/>
+              </svg>
+              <span style="font-family: var(--font-editorial); font-size: 30px; font-weight: 300; letter-spacing: 0.04em; color: var(--text-primary);">Lumen</span>
+            </div>
+            <span class="logo-variant-label">Primary — on light</span>
+          </div>
+          <!-- Dark variant -->
+          <div class="logo-variant">
+            <div class="logo-on-dark">
+              <div class="logo-inline">
+                <svg width="44" height="44" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="4" y="8" width="3" height="24" rx="1.5" fill="#F6F4F0"/>
+                  <rect x="12" y="14" width="3" height="18" rx="1.5" fill="#F6F4F0" opacity="0.7"/>
+                  <rect x="20" y="6" width="3" height="26" rx="1.5" fill="#F6F4F0" opacity="0.85"/>
+                  <rect x="28" y="11" width="3" height="21" rx="1.5" fill="#F6F4F0" opacity="0.55"/>
+                  <rect x="36" y="18" width="3" height="14" rx="1.5" fill="#F6F4F0" opacity="0.35"/>
+                  <line x1="2" y1="33.5" x2="40" y2="33.5" stroke="#F6F4F0" stroke-width="1" opacity="0.3"/>
+                </svg>
+                <span style="font-family: var(--font-editorial); font-size: 30px; font-weight: 300; letter-spacing: 0.04em; color: #F6F4F0;">Lumen</span>
+              </div>
+            </div>
+            <span class="logo-variant-label">Reversed — on dark</span>
+          </div>
+          <!-- Icon only -->
+          <div class="logo-variant">
+            <div style="display: flex; gap: 32px; align-items: center;">
+              <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="4" y="8" width="3" height="24" rx="1.5" fill="#4A2D4F"/>
+                <rect x="12" y="14" width="3" height="18" rx="1.5" fill="#4A2D4F" opacity="0.7"/>
+                <rect x="20" y="6" width="3" height="26" rx="1.5" fill="#4A2D4F" opacity="0.85"/>
+                <rect x="28" y="11" width="3" height="21" rx="1.5" fill="#4A2D4F" opacity="0.55"/>
+                <rect x="36" y="18" width="3" height="14" rx="1.5" fill="#4A2D4F" opacity="0.35"/>
+                <line x1="2" y1="33.5" x2="40" y2="33.5" stroke="#4A2D4F" stroke-width="1" opacity="0.3"/>
+              </svg>
+              <span style="font-family: var(--font-editorial); font-size: 22px; font-weight: 300; letter-spacing: 0.04em; color: var(--text-primary);">Lumen</span>
+            </div>
+            <span class="logo-variant-label">Mark + wordmark — compact</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Emotional Tone -->
+    <div>
+      <div class="section-label">Emotional Tone</div>
+      <div class="card">
+        <div class="tone-word">Calm <span class="tone-tag">not playful</span></div>
+        <div class="tone-word">Confident <span class="tone-tag">not flashy</span></div>
+        <div class="tone-word">Precise <span class="tone-tag">not rigid</span></div>
+        <div class="tone-word">Honest <span class="tone-tag">not blunt</span></div>
+        <div class="tone-word">Thoughtful <span class="tone-tag">not slow</span></div>
+      </div>
+      <div style="margin-top: 20px;">
+        <div class="section-label" style="margin-bottom: 12px;">Explicitly Avoid</div>
+        <div class="avoid-list">
+          <span class="avoid-tag">Playful</span>
+          <span class="avoid-tag">Magical</span>
+          <span class="avoid-tag">Futuristic</span>
+          <span class="avoid-tag">Chatty</span>
+          <span class="avoid-tag">AI-branded</span>
+          <span class="avoid-tag">Glassmorphism</span>
+          <span class="avoid-tag">Gradients</span>
+          <span class="avoid-tag">Heavy shadows</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: Color System -->
+  <div class="row">
+    <div class="section-label">Color System</div>
+    <div class="grid-5" style="margin-bottom: 24px;">
+      <div class="swatch-block">
+        <div class="swatch-color" style="background: #F6F4F0;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Background</div>
+          <div class="swatch-hex">#F6F4F0</div>
+        </div>
+      </div>
+      <div class="swatch-block">
+        <div class="swatch-color" style="background: #2C2A27;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Primary Text</div>
+          <div class="swatch-hex">#2C2A27</div>
+        </div>
+      </div>
+      <div class="swatch-block">
+        <div class="swatch-color" style="background: #7A756D;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Secondary</div>
+          <div class="swatch-hex">#7A756D</div>
+        </div>
+      </div>
+      <div class="swatch-block">
+        <div class="swatch-color" style="background: #A39E95;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Tertiary</div>
+          <div class="swatch-hex">#A39E95</div>
+        </div>
+      </div>
+      <div class="swatch-block">
+        <div class="swatch-color" style="background: #4A2D4F;"></div>
+        <div class="swatch-info">
+          <div class="swatch-name">Accent — Aubergine</div>
+          <div class="swatch-hex">#4A2D4F</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Data Visualization Palette</div>
+    <div class="data-palette">
+      <div class="data-palette-swatch" style="background: #4A2D4F;"></div>
+      <div class="data-palette-swatch" style="background: #C2876E;"></div>
+      <div class="data-palette-swatch" style="background: #6B8F8A;"></div>
+      <div class="data-palette-swatch" style="background: #B8A44C;"></div>
+      <div class="data-palette-swatch" style="background: #8C7B6B;"></div>
+      <div class="data-palette-swatch" style="background: #A3667E;"></div>
+    </div>
+    <div class="data-palette-label">
+      <span>Plum</span>
+      <span>Terracotta</span>
+      <span>Sage</span>
+      <span>Ochre</span>
+      <span>Driftwood</span>
+      <span>Mauve</span>
+    </div>
+    <div style="margin-top: 8px; font-size: 11px; color: var(--text-tertiary);">Muted, print-like tones inspired by FT editorial charts. No saturated primaries. No rainbow palettes.</div>
+  </div>
+
+  <!-- Row 3: Typography -->
+  <div class="row grid-2">
+    <div>
+      <div class="section-label">Typography — Editorial Serif</div>
+      <div class="card">
+        <div class="type-family-label">Source Serif 4 · Light 300</div>
+        <div class="type-specimen">
+          <div class="type-large type-serif">Revenue declined 12% quarter-over-quarter</div>
+          <div class="type-body type-serif" style="margin-top: 12px;">
+            The underlying signal suggests a structural shift in customer acquisition patterns, not a seasonal fluctuation. Three contributing factors deserve attention.
+          </div>
+          <div class="type-small type-serif" style="margin-top: 8px;">
+            Source: Internal analytics · Q3 FY2025 · Confidence: High
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Typography — UI Sans</div>
+      <div class="card">
+        <div class="type-family-label">DM Sans · Regular 400</div>
+        <div class="type-specimen">
+          <div class="type-large type-sans" style="font-weight: 400; font-size: 28px;">Clear hierarchy. Calm shapes. No quirks.</div>
+          <div class="type-body type-sans" style="margin-top: 12px;">
+            Excellent legibility at small sizes for labels, axes, metadata, and interface controls. Neutral enough to disappear, precise enough to trust.
+          </div>
+          <div class="type-small type-sans" style="margin-top: 8px;">
+            ABCDEFGHIJKLMNOPQRSTUVWXYZ · 0123456789 · $€£¥%
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 4: Chart + Narrative Integration -->
+  <div class="row grid-2">
+    <div>
+      <div class="section-label">Chart Language</div>
+      <div class="card card-flush">
+        <div class="chart-area">
+          <div class="chart-title">Customer acquisition cost by channel</div>
+          <div class="chart-subtitle">Indexed to Q1 2024 = 100 · Quarterly</div>
+          <div class="chart-container">
+            <svg class="chart-svg" viewBox="0 0 460 170">
+              <!-- Grid lines -->
+              <line x1="40" y1="10" x2="460" y2="10" stroke="#E8E5DF" stroke-width="0.5"/>
+              <line x1="40" y1="50" x2="460" y2="50" stroke="#E8E5DF" stroke-width="0.5"/>
+              <line x1="40" y1="90" x2="460" y2="90" stroke="#E8E5DF" stroke-width="0.5"/>
+              <line x1="40" y1="130" x2="460" y2="130" stroke="#E8E5DF" stroke-width="0.5"/>
+              <!-- Y-axis labels -->
+              <text x="34" y="14" class="chart-axis-label" text-anchor="end">160</text>
+              <text x="34" y="54" class="chart-axis-label" text-anchor="end">130</text>
+              <text x="34" y="94" class="chart-axis-label" text-anchor="end">100</text>
+              <text x="34" y="134" class="chart-axis-label" text-anchor="end">70</text>
+              <!-- X-axis labels -->
+              <text x="92" y="155" class="chart-axis-label" text-anchor="middle">Q1</text>
+              <text x="197" y="155" class="chart-axis-label" text-anchor="middle">Q2</text>
+              <text x="302" y="155" class="chart-axis-label" text-anchor="middle">Q3</text>
+              <text x="407" y="155" class="chart-axis-label" text-anchor="middle">Q4</text>
+              <!-- Line 1 — Paid Search (Plum) -->
+              <polyline points="92,90 197,72 302,40 407,22" fill="none" stroke="#4A2D4F" stroke-width="2"/>
+              <circle cx="92" cy="90" r="3" fill="#4A2D4F"/>
+              <circle cx="197" cy="72" r="3" fill="#4A2D4F"/>
+              <circle cx="302" cy="40" r="3" fill="#4A2D4F"/>
+              <circle cx="407" cy="22" r="3" fill="#4A2D4F"/>
+              <!-- Line 2 — Organic (Sage) -->
+              <polyline points="92,90 197,95 302,88 407,82" fill="none" stroke="#6B8F8A" stroke-width="2"/>
+              <circle cx="92" cy="90" r="3" fill="#6B8F8A"/>
+              <circle cx="197" cy="95" r="3" fill="#6B8F8A"/>
+              <circle cx="302" cy="88" r="3" fill="#6B8F8A"/>
+              <circle cx="407" cy="82" r="3" fill="#6B8F8A"/>
+              <!-- Line 3 — Referral (Terracotta) -->
+              <polyline points="92,90 197,100 302,112 407,118" fill="none" stroke="#C2876E" stroke-width="2"/>
+              <circle cx="92" cy="90" r="3" fill="#C2876E"/>
+              <circle cx="197" cy="100" r="3" fill="#C2876E"/>
+              <circle cx="302" cy="112" r="3" fill="#C2876E"/>
+              <circle cx="407" cy="118" r="3" fill="#C2876E"/>
+              <!-- Legend -->
+              <line x1="60" y1="168" x2="74" y2="168" stroke="#4A2D4F" stroke-width="2"/>
+              <text x="78" y="171" class="chart-axis-label">Paid search</text>
+              <line x1="160" y1="168" x2="174" y2="168" stroke="#6B8F8A" stroke-width="2"/>
+              <text x="178" y="171" class="chart-axis-label">Organic</text>
+              <line x1="240" y1="168" x2="254" y2="168" stroke="#C2876E" stroke-width="2"/>
+              <text x="258" y="171" class="chart-axis-label">Referral</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Narrative Integration</div>
+      <div class="card card-flush">
+        <div class="narrative-block">
+          <div class="narrative-label">AI-generated insight</div>
+          <p>
+            Paid search acquisition costs have increased <span class="highlight">58% since Q1</span>, significantly outpacing organic and referral channels. This divergence accelerated in Q3, coinciding with the competitor's market entry. Referral costs have actually <span class="highlight">decreased 18%</span>, suggesting word-of-mouth remains the most efficient channel at current scale.
+          </p>
+        </div>
+      </div>
+      <div style="margin-top: 16px; font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+        Chart and narrative are two views of the same truth. Highlighted data points in prose link to the visual representation. Subtle, not flashy.
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 5: Spacing + States + Principles -->
+  <div class="row grid-3">
+    <div>
+      <div class="section-label">Spacing Scale</div>
+      <div class="card">
+        <div class="spacing-demo">
+          <div class="spacing-row">
+            <span class="spacing-label">4</span>
+            <div class="spacing-bar" style="width: 16px;"></div>
+          </div>
+          <div class="spacing-row">
+            <span class="spacing-label">8</span>
+            <div class="spacing-bar" style="width: 32px;"></div>
+          </div>
+          <div class="spacing-row">
+            <span class="spacing-label">16</span>
+            <div class="spacing-bar" style="width: 64px;"></div>
+          </div>
+          <div class="spacing-row">
+            <span class="spacing-label">24</span>
+            <div class="spacing-bar" style="width: 96px;"></div>
+          </div>
+          <div class="spacing-row">
+            <span class="spacing-label">32</span>
+            <div class="spacing-bar" style="width: 128px;"></div>
+          </div>
+          <div class="spacing-row">
+            <span class="spacing-label">48</span>
+            <div class="spacing-bar" style="width: 192px;"></div>
+          </div>
+          <div class="spacing-row">
+            <span class="spacing-label">64</span>
+            <div class="spacing-bar" style="width: 100%;"></div>
+          </div>
+        </div>
+        <div style="margin-top: 16px; font-size: 11px; color: var(--text-tertiary); line-height: 1.5;">Whitespace is structure, not decoration. 8px base unit. Generous vertical rhythm between cells.</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Interaction States</div>
+      <div class="card">
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="state-row">
+            <span class="state-label">Rest</span>
+            <span class="state-chip state-default">Inspect SQL</span>
+          </div>
+          <div class="state-row">
+            <span class="state-label">Hover</span>
+            <span class="state-chip state-hover">Inspect SQL</span>
+          </div>
+          <div class="state-row">
+            <span class="state-label">Active</span>
+            <span class="state-chip state-active">Inspect SQL</span>
+          </div>
+        </div>
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
+          <div style="font-size: 11px; color: var(--text-tertiary); line-height: 1.5;">
+            Accent color used only for focus, selection, and key affordances. Transitions are subtle and measured — never bouncy. Motion explains state, not delight.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Design Principles</div>
+      <div class="card" style="padding: 4px 28px;">
+        <div class="principle-item">
+          <div class="principle-title">Quiet authority</div>
+          <div class="principle-desc">Strong hierarchy, consistent spacing, no visual gimmicks.</div>
+        </div>
+        <div class="principle-item">
+          <div class="principle-title">Professional honesty</div>
+          <div class="principle-desc">Flat surfaces, clear separation, obvious affordances for inspection.</div>
+        </div>
+        <div class="principle-item">
+          <div class="principle-title">Analytical calm</div>
+          <div class="principle-desc">Generous whitespace, soft contrast, measured rhythm.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- North Star -->
+  <div class="divider"></div>
+  <div class="north-star">
+    <blockquote>
+      More restrained. More honest. More inevitable.
+      <cite>Design North Star</cite>
+    </blockquote>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Lumen · Visual & Interaction Design</span>
+    <span>Release: Tufte</span>
+  </div>
+
+</div>
+</body>
+</html>

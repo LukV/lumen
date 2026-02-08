@@ -34,8 +34,6 @@ When the chart uses the wrong date field or aggregation, the user says “break 
 
 Given the same question against the same data and schema, Lumen produces the same query, the same chart, the same narrative. The system resolves the user’s intent into a canonical intermediate representation — a SQL query, a declarative chart specification, a data-bound narrative template — that is deterministic and replayable independently of the LLM. Every insight is auditable and version-controllable. Switching models does not break past work.
 
-
-
 ## WHAT MAKES LUMEN DIFFERENT
 
 Narrative as a first-class output
@@ -67,8 +65,6 @@ We believe the analyst, not the business user, is the right early adopter. Analy
 We believe reproducibility is a moat. Most conversational tools treat LLM output as the final artifact. Lumen treats it as a translation step. The artifact is a structured, deterministic object. This is harder to build but fundamentally more trustworthy — and it is what separates a notebook from a chatbot.
 
 We believe aesthetics are not superficial. A tool that looks and feels crafted earns trust faster. The experience of using Lumen should feel like opening a Moleskine, not a legal pad. Typographic care, restrained color, generous whitespace, calm confidence.
-
-
 
 ## VERSION 1 — RELEASE TUFTE
 

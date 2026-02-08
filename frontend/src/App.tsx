@@ -85,13 +85,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [cells, currentStage]);
+    if (isProcessing) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [cells, currentStage, isProcessing]);
 
   const handleCellUpdate = (updated: Cell) => {
     setCells((prev) =>
       prev.map((c) => (c.id === updated.id ? updated : c))
     );
+  };
+
+  const handleCellDelete = async (cellId: string) => {
+    try {
+      await fetch(`${API_BASE}/api/cells/${cellId}`, { method: "DELETE" });
+      setCells((prev) => prev.filter((c) => c.id !== cellId));
+    } catch { /* ignore */ }
   };
 
   const handleAsk = useCallback(
@@ -202,7 +211,7 @@ export default function App() {
 
       {/* Cells */}
       {cells.map((cell) => (
-        <CellView key={cell.id} cell={cell} onCellUpdate={handleCellUpdate} />
+        <CellView key={cell.id} cell={cell} onCellUpdate={handleCellUpdate} onCellDelete={handleCellDelete} />
       ))}
 
       {/* Stage indicator */}

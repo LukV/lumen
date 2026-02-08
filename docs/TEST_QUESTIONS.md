@@ -1,5 +1,5 @@
 💰 Revenue & performance
-- "What are the top 10 customers by revenue?"
+- **"What are the top 10 customers by revenue?"**
 - "Total revenue last month"
 - "Revenue by store for the last 6 months"
 - "Top 5 stores by revenue this year"
@@ -30,7 +30,7 @@
 - "Number of active customers by country"
 - "Customers with more than 10 rentals"
 - "Average revenue per customer"
-- "Top 10 customers by lifetime value"
+- **"Top 10 customers by lifetime value"**
 - "Customers who haven’t rented anything in the last 90 days"
 - "Repeat customers vs one-time customers"
 - "Customer retention by signup month"
@@ -101,3 +101,9 @@ These are gold for Lumen:
 - "Show me the top 5 instead"
 
 🔍 Tests: context retention, query refinement, delta reasoning
+
+___
+
+What-if scenarios
+
+- **"What if rental volume grows by 10%, what’s the expected revenue?"**

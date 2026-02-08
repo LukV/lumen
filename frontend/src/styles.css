@@ -211,6 +211,48 @@ body {
   flex: 1;
 }
 
+.cell__title-input {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  margin: 0;
+  outline: none;
+}
+
+.cell__title-input:focus {
+  border-color: var(--color-primary);
+  background: var(--color-bg-subtle);
+  padding: 2px var(--space-2);
+}
+
+.cell__delete-btn {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.cell:hover .cell__delete-btn {
+  opacity: 1;
+}
+
+.cell__delete-btn:hover {
+  color: var(--color-error);
+}
+
 .cell__badge {
   font-size: 10px;
   font-weight: 600;

@@ -179,6 +179,26 @@ async def run_sql(request: RunSQLRequest) -> EventSourceResponse:
     return EventSourceResponse(_event_stream())
 
 
+class UpdateCellRequest(BaseModel):
+    title: str
+
+
+@app.patch("/api/cells/{cell_id}")
+async def update_cell(cell_id: str, request: UpdateCellRequest) -> Any:
+    store = get_store(notebooks_dir())
+    if store.update_cell_title(cell_id, request.title):
+        return {"ok": True}
+    return JSONResponse(status_code=404, content={"error": f"Cell {cell_id} not found"})
+
+
+@app.delete("/api/cells/{cell_id}")
+async def delete_cell(cell_id: str) -> Any:
+    store = get_store(notebooks_dir())
+    if store.delete_cell(cell_id):
+        return {"ok": True}
+    return JSONResponse(status_code=404, content={"error": f"Cell {cell_id} not found"})
+
+
 @app.get("/api/notebook")
 async def get_notebook() -> list[dict[str, Any]]:
     store = get_store(notebooks_dir())

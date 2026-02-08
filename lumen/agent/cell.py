@@ -86,6 +86,7 @@ class Cell(BaseModel):
     id: str = Field(default_factory=generate_cell_id)
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     question: str = ""
+    title: str = ""
     context: CellContext = Field(default_factory=CellContext)
     sql: CellSQL | None = None
     result: CellResult | None = None

@@ -115,3 +115,47 @@ def test_multiple_cells_persist(tmp_path: Path) -> None:
     assert result.data is not None
     assert len(result.data.cells) == 5
     assert result.data.cells[3].question == "Q3"
+
+
+def test_delete_cell(tmp_path: Path) -> None:
+    store = NotebookStore(tmp_path)
+    cell = _make_cell("To delete")
+    store.add_cell(cell)
+    assert len(store.get_cells()) == 1
+
+    found = store.delete_cell(cell.id)
+    assert found is True
+    assert len(store.get_cells()) == 0
+
+    # Verify persisted
+    result = store.load(store.notebook.id)
+    assert result.ok
+    assert result.data is not None
+    assert len(result.data.cells) == 0
+
+
+def test_delete_cell_not_found(tmp_path: Path) -> None:
+    store = NotebookStore(tmp_path)
+    assert store.delete_cell("cell_nonexistent") is False
+
+
+def test_update_cell_title(tmp_path: Path) -> None:
+    store = NotebookStore(tmp_path)
+    cell = _make_cell("Original question")
+    store.add_cell(cell)
+
+    found = store.update_cell_title(cell.id, "Custom Title")
+    assert found is True
+    assert store.get_cell(cell.id) is not None
+    assert store.get_cell(cell.id).title == "Custom Title"  # type: ignore[union-attr]
+
+    # Verify persisted
+    result = store.load(store.notebook.id)
+    assert result.ok
+    assert result.data is not None
+    assert result.data.cells[0].title == "Custom Title"
+
+
+def test_update_cell_title_not_found(tmp_path: Path) -> None:
+    store = NotebookStore(tmp_path)
+    assert store.update_cell_title("cell_nonexistent", "Title") is False

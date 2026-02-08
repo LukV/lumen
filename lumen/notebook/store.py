@@ -48,6 +48,26 @@ class NotebookStore:
                 self.save()
                 return
 
+    def delete_cell(self, cell_id: str) -> bool:
+        """Remove a cell by ID, persist, return True if found."""
+        for i, cell in enumerate(self.notebook.cells):
+            if cell.id == cell_id:
+                self.notebook.cells.pop(i)
+                self.notebook.updated_at = datetime.now(UTC).isoformat()
+                self.save()
+                return True
+        return False
+
+    def update_cell_title(self, cell_id: str, title: str) -> bool:
+        """Set title on a cell, persist, return True if found."""
+        for cell in self.notebook.cells:
+            if cell.id == cell_id:
+                cell.title = title
+                self.notebook.updated_at = datetime.now(UTC).isoformat()
+                self.save()
+                return True
+        return False
+
     def get_cells(self) -> list[Cell]:
         return list(self.notebook.cells)
 
