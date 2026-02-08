@@ -18,6 +18,7 @@ from lumen.agent.cell import (
     CellResult,
     CellSQL,
     DataReference,
+    WhatIfMetadata,
 )
 from lumen.agent.executor import execute_query
 from lumen.agent.prompts import (
@@ -32,6 +33,9 @@ from lumen.schema.context import SchemaContext
 from lumen.viz.auto_detect import auto_detect_chart
 from lumen.viz.theme import apply_theme
 from lumen.viz.validator import validate_chart_spec
+from lumen.whatif.chart import build_trend_chart
+from lumen.whatif.explain import generate_caveats
+from lumen.whatif.trend import TrendParams, build_trend_sql
 
 logger = logging.getLogger("lumen.agent")
 
@@ -131,6 +135,7 @@ async def ask_question(
         reasoning = tool_input.get("reasoning", "")
         sql = tool_input.get("sql", "")
         chart_spec = tool_input.get("chart_spec", {})
+        whatif_input: dict[str, Any] | None = tool_input.get("whatif")
         logger.info("Call 1 result: sql=%r (len=%d)", sql[:80], len(sql))
 
         # Validate SQL
@@ -220,24 +225,94 @@ async def ask_question(
         yield error_event("No result data from execution")
         return
 
+    # --- What-if trend extrapolation ---
+    is_whatif = False
+    whatif_caveats: list[str] = []
+    whatif_meta: WhatIfMetadata | None = None
+
+    if whatif_input and whatif_input.get("technique") == "trend_extrapolation":
+        yield stage_event("projecting")
+        agent_steps.append("projecting")
+
+        trend_params = TrendParams(
+            time_field=whatif_input.get("time_field", ""),
+            measure=whatif_input.get("measure", ""),
+            periods_ahead=whatif_input.get("periods_ahead", 3),
+            period_interval=whatif_input.get("period_interval", "month"),
+        )
+        trend_result = build_trend_sql(sql, params=trend_params)
+
+        if trend_result.ok and trend_result.data is not None:
+            # Re-execute with wrapped SQL
+            trend_sql = trend_result.data.sql
+            logger.info("Trend SQL built, re-executing wrapped query")
+
+            trend_exec = await execute_query(
+                dsn,
+                trend_sql,
+                timeout_seconds=config.settings.statement_timeout_seconds,
+                max_rows=config.settings.max_result_rows,
+            )
+
+            if trend_exec.ok and trend_exec.data is not None:
+                sql = trend_sql
+                cell_result = trend_exec.data
+                is_whatif = True
+                whatif_caveats = generate_caveats(
+                    "trend_extrapolation",
+                    {
+                        "periods_ahead": trend_params.periods_ahead,
+                        "period_interval": trend_params.period_interval,
+                    },
+                )
+                whatif_meta = WhatIfMetadata(
+                    technique="trend_extrapolation",
+                    parameters={
+                        "time_field": trend_params.time_field,
+                        "measure": trend_params.measure,
+                        "periods_ahead": trend_params.periods_ahead,
+                        "period_interval": trend_params.period_interval,
+                    },
+                    caveats=whatif_caveats,
+                )
+            else:
+                logger.warning("Trend SQL execution failed, falling back to baseline")
+        else:
+            logger.warning("Trend SQL build failed: %s", trend_result.diagnostics)
+
     # --- Validate chart spec ---
     auto_detected = False
-    spec_validation = validate_chart_spec(chart_spec, cell_result.columns)
-    if not spec_validation.ok:
-        chart_spec = auto_detect_chart(
-            cell_result.columns,
-            cell_result.column_types,
-            schema_ctx.enriched,
+    if is_whatif and whatif_input:
+        # Override chart with layered trend chart
+        chart_spec = build_trend_chart(
+            whatif_input.get("time_field", ""),
+            whatif_input.get("measure", ""),
         )
         auto_detected = True
     else:
-        chart_spec = apply_theme(chart_spec)
+        spec_validation = validate_chart_spec(chart_spec, cell_result.columns)
+        if not spec_validation.ok:
+            chart_spec = auto_detect_chart(
+                cell_result.columns,
+                cell_result.column_types,
+                schema_ctx.enriched,
+            )
+            auto_detected = True
+        else:
+            chart_spec = apply_theme(chart_spec)
 
     # --- Call 2: Narrate results ---
     yield stage_event("narrating")
     agent_steps.append("narrating")
 
-    narrative_text, data_references = await _narrate(client, model, question, sql, cell_result)
+    narrative_text, data_references = await _narrate(
+        client,
+        model,
+        question,
+        sql,
+        cell_result,
+        caveats=whatif_caveats if is_whatif else None,
+    )
 
     # --- Build Cell ---
     cell = Cell(
@@ -255,6 +330,7 @@ async def ask_question(
             agent_steps=agent_steps,
             retry_count=retry_count,
             reasoning=reasoning,
+            whatif=whatif_meta,
         ),
     )
 
@@ -344,9 +420,10 @@ async def _narrate(
     question: str,
     sql: str,
     cell_result: CellResult,
+    caveats: list[str] | None = None,
 ) -> tuple[str, list[DataReference]]:
     """Run Call 2 (narrate_results) and return (text, references)."""
-    narrate_prompt = build_narrate_prompt(question, sql, cell_result)
+    narrate_prompt = build_narrate_prompt(question, sql, cell_result, caveats=caveats)
     narrate_response = client.messages.create(  # type: ignore[call-overload]
         model=model,
         max_tokens=1024,

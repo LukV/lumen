@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-
-interface SchemaData {
-  database: string;
-  tables: {
-    name: string;
-    columns: { name: string; role: string }[];
-  }[];
-}
+import type { SchemaData } from "../types/schema";
 
 interface InputBarProps {
   onAsk: (question: string) => void;

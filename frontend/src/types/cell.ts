@@ -46,12 +46,19 @@ export interface CellNarrative {
   data_references: DataReference[];
 }
 
+export interface WhatIfMetadata {
+  technique: string;
+  parameters: Record<string, unknown>;
+  caveats: string[];
+}
+
 export interface CellMetadata {
   model: string;
   schema_version: string;
   agent_steps: string[];
   retry_count: number;
   reasoning: string;
+  whatif?: WhatIfMetadata | null;
 }
 
 export interface Cell {

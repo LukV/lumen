@@ -32,3 +32,13 @@ export interface SchemaContext {
   augmented_docs: string | null;
   hash: string;
 }
+
+/** Simplified schema data as returned by /api/schema → .schema */
+export interface SchemaData {
+  database: string;
+  tables: {
+    name: string;
+    row_count: number;
+    columns: { name: string; role: string; data_type: string }[];
+  }[];
+}

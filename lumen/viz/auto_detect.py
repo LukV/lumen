@@ -9,7 +9,9 @@ from __future__ import annotations
 from typing import Any
 
 from lumen.schema.enricher import EnrichedSchema
-from lumen.viz.theme import apply_theme
+from lumen.viz.theme import LUMEN_PALETTE, apply_theme
+
+_PRIMARY = LUMEN_PALETTE[0]
 
 
 def auto_detect_chart(
@@ -125,7 +127,7 @@ def _bar_spec(x: str, y: str) -> dict[str, Any]:
         "encoding": {
             "x": {"field": x, "type": "nominal", "sort": "-y"},
             "y": {"field": y, "type": "quantitative"},
-            "color": {"value": "#3b5998"},
+            "color": {"value": _PRIMARY},
         },
         "width": "container",
         "height": 300,
@@ -138,7 +140,7 @@ def _line_spec(x: str, y: str) -> dict[str, Any]:
         "encoding": {
             "x": {"field": x, "type": "temporal"},
             "y": {"field": y, "type": "quantitative"},
-            "color": {"value": "#3b5998"},
+            "color": {"value": _PRIMARY},
         },
         "width": "container",
         "height": 300,
@@ -151,7 +153,7 @@ def _scatter_spec(x: str, y: str) -> dict[str, Any]:
         "encoding": {
             "x": {"field": x, "type": "quantitative"},
             "y": {"field": y, "type": "quantitative"},
-            "color": {"value": "#3b5998"},
+            "color": {"value": _PRIMARY},
         },
         "width": "container",
         "height": 300,
@@ -178,7 +180,7 @@ def _kpi_spec(field: str) -> dict[str, Any]:
             "type": "text",
             "fontSize": 48,
             "fontWeight": 700,
-            "color": "#3b5998",
+            "color": _PRIMARY,
         },
         "encoding": {
             "text": {"field": field, "type": "quantitative", "format": ",.2~f"},

@@ -50,6 +50,15 @@ async def _get_schema_ctx() -> SchemaContext | None:
     return _schema_ctx
 
 
+def _sse_error(code: str, message: str) -> EventSourceResponse:
+    """Return an SSE response with a single error event."""
+
+    async def _stream() -> AsyncGenerator[dict[str, str]]:
+        yield {"event": "error", "data": json.dumps({"code": code, "message": message})}
+
+    return EventSourceResponse(_stream())
+
+
 @app.on_event("startup")
 async def _startup() -> None:
     """Load the most recent notebook for the active connection on startup."""
@@ -109,12 +118,7 @@ async def ask(request: AskRequest) -> EventSourceResponse:
     ctx = await _get_schema_ctx()
     if ctx is None:
         logger.warning("No schema loaded")
-
-        async def _error_stream() -> AsyncGenerator[dict[str, str]]:
-            payload = {"code": "NO_SCHEMA", "message": "No schema loaded. Run `lumen connect` first."}
-            yield {"event": "error", "data": json.dumps(payload)}
-
-        return EventSourceResponse(_error_stream())
+        return _sse_error("NO_SCHEMA", "No schema loaded. Run `lumen connect` first.")
 
     config = load_config()
     store = get_store(notebooks_dir())
@@ -148,24 +152,14 @@ async def run_sql(request: RunSQLRequest) -> EventSourceResponse:
     logger.info("POST /api/run-sql cell_id=%s", request.cell_id)
     ctx = await _get_schema_ctx()
     if ctx is None:
-
-        async def _error_stream() -> AsyncGenerator[dict[str, str]]:
-            payload = {"code": "NO_SCHEMA", "message": "No schema loaded."}
-            yield {"event": "error", "data": json.dumps(payload)}
-
-        return EventSourceResponse(_error_stream())
+        return _sse_error("NO_SCHEMA", "No schema loaded.")
 
     config = load_config()
     store = get_store(notebooks_dir())
     original_cell = store.get_cell(request.cell_id)
 
     if original_cell is None:
-
-        async def _not_found_stream() -> AsyncGenerator[dict[str, str]]:
-            payload = {"code": "NOT_FOUND", "message": f"Cell {request.cell_id} not found"}
-            yield {"event": "error", "data": json.dumps(payload)}
-
-        return EventSourceResponse(_not_found_stream())
+        return _sse_error("NOT_FOUND", f"Cell {request.cell_id} not found")
 
     async def _event_stream() -> AsyncGenerator[dict[str, str]]:
         try:

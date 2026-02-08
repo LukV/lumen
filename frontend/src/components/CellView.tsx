@@ -11,6 +11,7 @@ interface CellViewProps {
 
 export default function CellView({ cell, onCellUpdate }: CellViewProps) {
   const [showCode, setShowCode] = useState(false);
+  const [showCaveats, setShowCaveats] = useState(false);
   const [hoveredDatum, setHoveredDatum] = useState<Record<
     string,
     unknown
@@ -28,6 +29,9 @@ export default function CellView({ cell, onCellUpdate }: CellViewProps) {
       {/* Question header */}
       <div className="cell__header">
         <h3 className="cell__question">{cell.question}</h3>
+        {cell.metadata.whatif && (
+          <span className="cell__badge cell__badge--projection">projection</span>
+        )}
         {cell.sql?.edited_by_user && (
           <span className="cell__badge">edited</span>
         )}
@@ -76,6 +80,25 @@ export default function CellView({ cell, onCellUpdate }: CellViewProps) {
           dataReferences={cell.narrative.data_references}
           highlightedDatum={hoveredDatum}
         />
+      )}
+
+      {/* Caveats */}
+      {cell.metadata.whatif?.caveats && cell.metadata.whatif.caveats.length > 0 && (
+        <div className="cell__caveats">
+          <button
+            onClick={() => setShowCaveats(!showCaveats)}
+            className="cell__caveats-toggle"
+          >
+            {showCaveats ? "Hide assumptions" : "View assumptions"}
+          </button>
+          {showCaveats && (
+            <ul className="cell__caveats-list">
+              {cell.metadata.whatif.caveats.map((caveat, i) => (
+                <li key={i}>{caveat}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* Code toggle */}

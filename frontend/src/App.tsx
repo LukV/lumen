@@ -1,21 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Cell } from "./types/cell";
+import type { SchemaData } from "./types/schema";
+import { API_BASE } from "./config";
+import { consumeSSE } from "./utils/sse";
 import CellView from "./components/CellView";
 import InputBar from "./components/InputBar";
 import StageIndicator from "./components/StageIndicator";
-
-const API_BASE = "http://localhost:8000";
-
-interface SchemaTable {
-  name: string;
-  row_count: number;
-  columns: { name: string; role: string; data_type: string }[];
-}
-
-interface SchemaData {
-  database: string;
-  tables: SchemaTable[];
-}
 
 interface HealthData {
   ok: boolean;
@@ -128,52 +118,17 @@ export default function App() {
           throw new Error(`Server error: ${response.status}`);
         }
 
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error("No response body");
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let eventType = "";
-        let eventData = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const rawLine of lines) {
-            const line = rawLine.replace(/\r$/, "");
-
-            if (line.startsWith("event:")) {
-              eventType = line.slice(6).trim();
-            } else if (line.startsWith("data:")) {
-              eventData = line.slice(5).trim();
-            } else if (line === "") {
-              if (eventType && eventData) {
-                console.log("[SSE]", eventType, eventData.slice(0, 120));
-                try {
-                  const data = JSON.parse(eventData);
-                  if (eventType === "stage") {
-                    setCurrentStage(data.stage);
-                  } else if (eventType === "cell") {
-                    setCells((prev) => [...prev, data as Cell]);
-                    setCurrentStage(null);
-                  } else if (eventType === "error") {
-                    setError(data.message);
-                    setCurrentStage(null);
-                  }
-                } catch (e) {
-                  console.error("[SSE] parse error:", e, eventData);
-                }
-              }
-              eventType = "";
-              eventData = "";
-            }
-          }
-        }
+        await consumeSSE(response, {
+          onStage: (stage) => setCurrentStage(stage),
+          onCell: (data) => {
+            setCells((prev) => [...prev, data as Cell]);
+            setCurrentStage(null);
+          },
+          onError: (message) => {
+            setError(message);
+            setCurrentStage(null);
+          },
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
         setCurrentStage(null);

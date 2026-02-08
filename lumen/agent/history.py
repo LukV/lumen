@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from xml.sax.saxutils import escape as _escape_xml
+
 from lumen.agent.cell import Cell
 
 
@@ -52,8 +54,3 @@ def build_refinement_context(parent_cell: Cell) -> str:
 
     lines.append("</parent_cell>")
     return "\n".join(lines)
-
-
-def _escape_xml(text: str) -> str:
-    """Escape XML special characters."""
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

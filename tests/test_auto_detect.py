@@ -54,11 +54,13 @@ def test_spec_has_theme_applied() -> None:
 
 
 def test_time_plus_two_measures_gives_stacked_area() -> None:
-    schema = _make_schema([
-        ("month", "date", "time_dimension"),
-        ("revenue", "numeric", "measure_candidate"),
-        ("cost", "numeric", "measure_candidate"),
-    ])
+    schema = _make_schema(
+        [
+            ("month", "date", "time_dimension"),
+            ("revenue", "numeric", "measure_candidate"),
+            ("cost", "numeric", "measure_candidate"),
+        ]
+    )
     spec = auto_detect_chart(["month", "revenue", "cost"], ["date", "float", "float"], schema)
     assert spec["mark"]["type"] == "area"
     assert spec["encoding"]["x"]["field"] == "month"

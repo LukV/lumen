@@ -36,6 +36,39 @@ PLAN_TOOL: dict[str, Any] = {
                     "Set width to 'container'."
                 ),
             },
+            "whatif": {
+                "type": "object",
+                "description": (
+                    "Optional. When the user asks about future trends, projections, or forecasts, "
+                    "include this to trigger trend extrapolation. The system will wrap your SQL "
+                    "with regression and future period generation."
+                ),
+                "properties": {
+                    "technique": {
+                        "type": "string",
+                        "enum": ["trend_extrapolation"],
+                        "description": "The what-if technique to apply.",
+                    },
+                    "time_field": {
+                        "type": "string",
+                        "description": "The time/date column name from the SQL output.",
+                    },
+                    "measure": {
+                        "type": "string",
+                        "description": "The numeric measure column name from the SQL output.",
+                    },
+                    "periods_ahead": {
+                        "type": "integer",
+                        "description": "Number of future periods to project (default 3, max 24).",
+                    },
+                    "period_interval": {
+                        "type": "string",
+                        "enum": ["day", "week", "month", "quarter", "year"],
+                        "description": "The interval for each projected period (default 'month').",
+                    },
+                },
+                "required": ["technique", "time_field", "measure"],
+            },
         },
         "required": ["reasoning", "sql", "chart_spec"],
     },
@@ -110,6 +143,9 @@ def build_system_prompt(
         "7. For the chart_spec: use Vega-Lite v5. Field names must exactly match SQL column aliases.",
         "8. Set chart width to 'container'. Choose appropriate mark types (bar, line, point, etc.).",
         "9. For bar charts with categorical data, sort by the measure descending (sort: '-y').",
+        "10. When the user asks about future trends, projections, or forecasts, include the 'whatif' "
+        "parameter with technique 'trend_extrapolation'. Write baseline SQL that returns the time series "
+        "(time column + measure column), and the system will wrap it with regression and projection.",
     ]
 
     # Conversation context from previous cells
@@ -134,28 +170,39 @@ def build_system_prompt(
     return "\n".join(parts)
 
 
-def build_narrate_prompt(question: str, sql: str, result: CellResult) -> str:
+def build_narrate_prompt(
+    question: str,
+    sql: str,
+    result: CellResult,
+    caveats: list[str] | None = None,
+) -> str:
     """Build the system prompt for Call 2 (narrate_results)."""
     data_text = format_result_for_llm(result)
 
-    return "\n".join(
-        [
-            "You are Lumen, an expert data analyst. Based on the query results below, "
-            "write a concise narrative insight.",
-            "",
-            f"## Question: {question}",
-            "",
-            f"## SQL Query\n```sql\n{sql}\n```",
-            "",
-            f"## Results ({result.row_count} rows)\n{data_text}",
-            "",
-            "## Instructions",
-            "1. Write 2-4 sentences highlighting the key findings.",
-            "2. Reference specific data values (numbers, names) from the results.",
-            "3. Be analytical and direct — state what the data shows, not generic observations.",
-            "4. Include data_references for each specific value you mention.",
-        ]
-    )
+    parts = [
+        "You are Lumen, an expert data analyst. Based on the query results below, write a concise narrative insight.",
+        "",
+        f"## Question: {question}",
+        "",
+        f"## SQL Query\n```sql\n{sql}\n```",
+        "",
+        f"## Results ({result.row_count} rows)\n{data_text}",
+        "",
+        "## Instructions",
+        "1. Write 2-4 sentences highlighting the key findings.",
+        "2. Reference specific data values (numbers, names) from the results.",
+        "3. Be analytical and direct — state what the data shows, not generic observations.",
+        "4. Include data_references for each specific value you mention.",
+    ]
+
+    if caveats:
+        parts.append("")
+        parts.append("## Caveats")
+        parts.append("This analysis uses projected data. Acknowledge the projection in your narrative.")
+        for i, caveat in enumerate(caveats, 1):
+            parts.append(f"{i}. {caveat}")
+
+    return "\n".join(parts)
 
 
 def format_result_for_llm(result: CellResult) -> str:

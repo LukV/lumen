@@ -14,6 +14,7 @@ def validate_chart_spec(spec: dict[str, Any], columns: list[str]) -> Result[dict
     """Validate a Vega-Lite spec structurally against result columns.
 
     Checks mark type, encoding presence, field name validity, and encoding types.
+    Supports layered specs: if spec has 'layer', validates each layer independently.
     Returns the spec on success, diagnostics on failure.
     """
     result: Result[dict[str, Any]] = Result()
@@ -21,6 +22,32 @@ def validate_chart_spec(spec: dict[str, Any], columns: list[str]) -> Result[dict
     if not spec:
         result.error("CHART_EMPTY", "Chart spec is empty")
         return result
+
+    # Layered spec: validate each layer independently
+    layers = spec.get("layer")
+    if isinstance(layers, list):
+        for i, layer in enumerate(layers):
+            if not isinstance(layer, dict):
+                result.error("CHART_INVALID_LAYER", f"Layer {i} must be an object")
+                continue
+            layer_result = _validate_single_spec(layer, columns)
+            for diag in layer_result.diagnostics:
+                result.diagnostics.append(diag)
+        if result.ok:
+            result.data = spec
+        return result
+
+    # Single spec
+    single_result = _validate_single_spec(spec, columns)
+    result.diagnostics = single_result.diagnostics
+    if result.ok:
+        result.data = spec
+    return result
+
+
+def _validate_single_spec(spec: dict[str, Any], columns: list[str]) -> Result[dict[str, Any]]:
+    """Validate a single (non-layered) Vega-Lite spec."""
+    result: Result[dict[str, Any]] = Result()
 
     # Check mark
     mark = spec.get("mark")
@@ -52,8 +79,5 @@ def validate_chart_spec(spec: dict[str, Any], columns: list[str]) -> Result[dict
         enc_type = enc_def.get("type")
         if enc_type and enc_type not in _VALID_ENCODING_TYPES:
             result.error("CHART_INVALID_TYPE", f"Invalid encoding type '{enc_type}' in {channel}")
-
-    if result.ok:
-        result.data = spec
 
     return result

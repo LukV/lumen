@@ -67,12 +67,19 @@ class CellNarrative(BaseModel):
     data_references: list[DataReference] = Field(default_factory=list)
 
 
+class WhatIfMetadata(BaseModel):
+    technique: str
+    parameters: dict[str, object] = Field(default_factory=dict)
+    caveats: list[str] = Field(default_factory=list)
+
+
 class CellMetadata(BaseModel):
     model: str = ""
     schema_version: str = ""
     agent_steps: list[str] = Field(default_factory=list)
     retry_count: int = 0
     reasoning: str = ""
+    whatif: WhatIfMetadata | None = None
 
 
 class Cell(BaseModel):

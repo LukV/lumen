@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { Cell } from "../types/cell";
+import { API_BASE } from "../config";
+import { consumeSSE } from "../utils/sse";
 import StageIndicator from "./StageIndicator";
-
-const API_BASE = "http://localhost:8000";
 
 type Tab = "sql" | "chart" | "reasoning";
 
@@ -35,50 +35,17 @@ export default function CodeView({ cell, onCellUpdate }: CodeViewProps) {
 
       if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let eventType = "";
-      let eventData = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const rawLine of lines) {
-          const line = rawLine.replace(/\r$/, "");
-          if (line.startsWith("event:")) {
-            eventType = line.slice(6).trim();
-          } else if (line.startsWith("data:")) {
-            eventData = line.slice(5).trim();
-          } else if (line === "") {
-            if (eventType && eventData) {
-              try {
-                const data = JSON.parse(eventData);
-                if (eventType === "stage") {
-                  setRunStage(data.stage);
-                } else if (eventType === "cell") {
-                  onCellUpdate(data as Cell);
-                  setRunStage(null);
-                } else if (eventType === "error") {
-                  setRunError(data.message);
-                  setRunStage(null);
-                }
-              } catch {
-                console.error("[run-sql] parse error:", eventData);
-              }
-            }
-            eventType = "";
-            eventData = "";
-          }
-        }
-      }
+      await consumeSSE(response, {
+        onStage: (stage) => setRunStage(stage),
+        onCell: (data) => {
+          onCellUpdate(data as Cell);
+          setRunStage(null);
+        },
+        onError: (message) => {
+          setRunError(message);
+          setRunStage(null);
+        },
+      });
     } catch (err) {
       setRunError(err instanceof Error ? err.message : "Unknown error");
       setRunStage(null);
