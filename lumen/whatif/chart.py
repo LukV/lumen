@@ -22,7 +22,7 @@ def build_trend_chart(time_field: str, measure: str) -> dict[str, Any]:
                 "encoding": {
                     "x": {"field": time_field, "type": "temporal"},
                     "y": {"field": measure, "type": "quantitative"},
-                    "color": {"value": "#3b5998"},
+                    "color": {"value": "#4A2D4F"},
                 },
             },
             # Projections: dashed line + diamond points
@@ -37,7 +37,7 @@ def build_trend_chart(time_field: str, measure: str) -> dict[str, Any]:
                 "encoding": {
                     "x": {"field": time_field, "type": "temporal"},
                     "y": {"field": measure, "type": "quantitative"},
-                    "color": {"value": "#c67a3c"},
+                    "color": {"value": "#C2876E"},
                 },
             },
         ],

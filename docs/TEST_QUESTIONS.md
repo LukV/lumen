@@ -43,7 +43,7 @@
 - "Revenue by month for the last year"
 - "Compare this month to the same month last year"
 - "Week-over-week rental growth"
-- "Seasonality of rentals by category"
+- **"Seasonality of rentals by category"**
 - "Best performing month historically"
 - "Trend of average rental duration over time"
 
@@ -68,7 +68,7 @@
 - "Which films are rarely rented but generate high revenue?"
 - "Customers who rented last month but not this month". Follow up question "compare that month over month for the last 6 months"
 - "Stores with high volume but low revenue"
-- "Are newer films performing better than older ones?"
+- **"Are newer films performing better than older ones?"**
 
 🔍 Tests: derived metrics, implicit comparisons, multi-step reasoning
 
@@ -107,3 +107,4 @@ ___
 What-if scenarios
 
 - **"What if rental volume grows by 10%, what’s the expected revenue?"**
+- **What happens to total revenue if prices increase by 5%?**

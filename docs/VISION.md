@@ -1,6 +1,6 @@
-Lumen
+# Lumen
 
-From question to insight in one conversation.
+_From question to insight in one conversation._
 
 ## THE PROBLEM
 
@@ -22,11 +22,11 @@ The early user is not a casual business user looking for self-serve analytics �
 
 ## THREE DESIGN PILLARS
 
-1. Explainability
+### 1. Explainability
 
 Every visualization can be expanded to reveal the query and logic underneath it. The generated SQL is visible with a single click, collapsed by default as progressive disclosure. Analysts will not trust a black box. The conversation itself is the reproducible artifact — this is what makes Lumen a notebook, not a chatbot.
 
-2. Conversational correction
+### 2. Conversational correction
 
 When the chart uses the wrong date field or aggregation, the user says “break that down by quarter instead” or clicks to adjust — they do not start over. The analyst can also edit the generated SQL directly and re-run it, and Lumen respects those edits in the ongoing conversation. This is where most conversational analytics tools fail, and where Lumen must excel.
 

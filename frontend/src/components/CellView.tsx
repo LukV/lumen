@@ -7,11 +7,12 @@ import NarrativeView from "./NarrativeView";
 
 interface CellViewProps {
   cell: Cell;
+  theme: "light" | "dark";
   onCellUpdate: (updated: Cell) => void;
   onCellDelete: (cellId: string) => void;
 }
 
-export default function CellView({ cell, onCellUpdate, onCellDelete }: CellViewProps) {
+export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: CellViewProps) {
   const [showCode, setShowCode] = useState(false);
   const [showCaveats, setShowCaveats] = useState(false);
   const [hoveredDatum, setHoveredDatum] = useState<Record<
@@ -80,129 +81,147 @@ export default function CellView({ cell, onCellUpdate, onCellDelete }: CellViewP
 
   return (
     <div className="cell">
-      {/* Question header */}
-      <div className="cell__header">
-        {editingTitle ? (
-          <input
-            ref={titleInputRef}
-            className="cell__title-input"
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={commitTitle}
-            onKeyDown={handleTitleKeyDown}
-          />
-        ) : (
-          <h3
-            className="cell__question"
-            onDoubleClick={startEditing}
-            title="Double-click to edit title"
+      {/* Cell body */}
+      <div className="cell-body">
+        {/* Title header */}
+        <div className="cell__header">
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              className="cell__title-input"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={handleTitleKeyDown}
+            />
+          ) : (
+            <h3
+              className="cell__question"
+              onDoubleClick={startEditing}
+              title="Double-click to edit title"
+            >
+              {displayTitle}
+            </h3>
+          )}
+          {cell.metadata.whatif && (
+            <span className="cell__badge cell__badge--projection">projection</span>
+          )}
+          {cell.sql?.edited_by_user && (
+            <span className="cell__badge">edited</span>
+          )}
+          <button
+            className="cell__delete-btn"
+            onClick={() => onCellDelete(cell.id)}
+            aria-label="Remove cell"
           >
-            {displayTitle}
-          </h3>
+            &times;
+          </button>
+        </div>
+
+        {/* Error banner */}
+        {hasErrors && (
+          <div className="error-banner">
+            <div className="error-banner__content">
+              {cell.result?.diagnostics
+                ?.filter((d) => d.severity === "error")
+                .map((d, i) => (
+                  <div key={i}>
+                    {d.message}
+                    {d.hint && (
+                      <span className="error-banner__hint">Hint: {d.hint}</span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
         )}
-        {cell.metadata.whatif && (
-          <span className="cell__badge cell__badge--projection">projection</span>
+
+        {/* Empty results */}
+        {emptyResult && (
+          <div className="cell__empty-results">
+            Query returned no results. Try broadening your filters.
+          </div>
         )}
-        {cell.sql?.edited_by_user && (
-          <span className="cell__badge">edited</span>
+
+        {/* Chart */}
+        {cell.chart && hasData && (
+          <div className="cell__chart">
+            <ChartRenderer
+              spec={cell.chart.spec}
+              data={cell.result!.data}
+              theme={theme}
+              onHoverData={setHoveredDatum}
+            />
+          </div>
         )}
-        <button
-          className="cell__delete-btn"
-          onClick={() => onCellDelete(cell.id)}
-          aria-label="Remove cell"
-        >
-          &times;
-        </button>
+
+        {/* Narrative */}
+        {cell.narrative && (
+          <div className="cell-insight">
+            <NarrativeView
+              text={cell.narrative.text}
+              dataReferences={cell.narrative.data_references}
+              highlightedDatum={hoveredDatum}
+            />
+          </div>
+        )}
+
+        {/* Caveats */}
+        {cell.metadata.whatif?.caveats && cell.metadata.whatif.caveats.length > 0 && (
+          <div className="cell__caveats">
+            <button
+              onClick={() => setShowCaveats(!showCaveats)}
+              className="cell__caveats-toggle"
+            >
+              {showCaveats ? "Hide assumptions" : "View assumptions"}
+            </button>
+            {showCaveats && (
+              <ul className="cell__caveats-list">
+                {cell.metadata.whatif.caveats.map((caveat, i) => (
+                  <li key={i}>{caveat}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Error banner */}
-      {hasErrors && (
-        <div className="error-banner">
-          <div className="error-banner__content">
-            {cell.result?.diagnostics
-              ?.filter((d) => d.severity === "error")
-              .map((d, i) => (
-                <div key={i}>
-                  {d.message}
-                  {d.hint && (
-                    <span className="error-banner__hint">Hint: {d.hint}</span>
-                  )}
-                </div>
-              ))}
+      {/* Footer strip */}
+      {cell.sql && (
+        <div className="cell-footer">
+          <div className="cell-footer-left">
+            <button
+              className="cell-link"
+              onClick={() => setShowCode(!showCode)}
+            >
+              <span className={`arrow ${showCode ? "open" : ""}`}>&#9656;</span>
+              {showCode ? "Hide code" : "Show code"}
+            </button>
+          </div>
+          <div className="cell-meta-strip">
+            {cell.result && (
+              <>
+                <span>{cell.result.row_count} rows</span>
+                <span className="sep" />
+                <span>{cell.result.execution_time_ms}ms</span>
+              </>
+            )}
+            {cell.metadata.model && (
+              <>
+                {cell.result && <span className="sep" />}
+                <span>{cell.metadata.model}</span>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* Empty results */}
-      {emptyResult && (
-        <div className="cell__empty-results">
-          Query returned no results. Try broadening your filters.
-        </div>
-      )}
-
-      {/* Chart */}
-      {cell.chart && hasData && (
-        <div className="cell__chart">
-          <ChartRenderer
-            spec={cell.chart.spec}
-            data={cell.result!.data}
-            onHoverData={setHoveredDatum}
-          />
-        </div>
-      )}
-
-      {/* Narrative */}
-      {cell.narrative && (
-        <NarrativeView
-          text={cell.narrative.text}
-          dataReferences={cell.narrative.data_references}
-          highlightedDatum={hoveredDatum}
-        />
-      )}
-
-      {/* Caveats */}
-      {cell.metadata.whatif?.caveats && cell.metadata.whatif.caveats.length > 0 && (
-        <div className="cell__caveats">
-          <button
-            onClick={() => setShowCaveats(!showCaveats)}
-            className="cell__caveats-toggle"
-          >
-            {showCaveats ? "Hide assumptions" : "View assumptions"}
-          </button>
-          {showCaveats && (
-            <ul className="cell__caveats-list">
-              {cell.metadata.whatif.caveats.map((caveat, i) => (
-                <li key={i}>{caveat}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {/* Code toggle */}
+      {/* Code drawer */}
       {cell.sql && (
-        <div className="cell__code-toggle">
-          <button
-            onClick={() => setShowCode(!showCode)}
-            className="cell__code-toggle-btn"
-          >
-            {showCode ? "Hide code" : "Show code"}
-          </button>
-          {showCode && <CodeView cell={cell} onCellUpdate={onCellUpdate} />}
+        <div className={`code-drawer ${showCode ? "open" : ""}`}>
+          <CodeView cell={cell} onCellUpdate={onCellUpdate} />
         </div>
       )}
-
-      {/* Footer */}
-      <div className="cell__footer">
-        {cell.result && (
-          <>
-            <span>{cell.result.row_count} rows</span>
-            <span>{cell.result.execution_time_ms}ms</span>
-          </>
-        )}
-        {cell.metadata.model && <span>{cell.metadata.model}</span>}
-        {cell.chart?.auto_detected && <span>auto-detected chart</span>}
-      </div>
     </div>
   );
 }

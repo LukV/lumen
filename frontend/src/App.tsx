@@ -179,11 +179,13 @@ export default function App() {
       {/* Topbar */}
       <header className="topbar">
         <div className="topbar-left">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <rect x="1" y="10" width="2.4" height="7" rx="1" fill="var(--logo-fill)" />
-            <rect x="5" y="7" width="2.4" height="10" rx="1" fill="var(--logo-fill)" />
-            <rect x="9" y="4" width="2.4" height="13" rx="1" fill="var(--logo-fill)" />
-            <rect x="13" y="1" width="2.4" height="16" rx="1" fill="var(--logo-fill)" />
+          <svg width="26" height="26" viewBox="0 0 40 40" fill="none">
+            <rect x="4" y="8" width="3" height="24" rx="1.5" fill="var(--logo-fill)" />
+            <rect x="12" y="14" width="3" height="18" rx="1.5" fill="var(--logo-fill)" opacity="0.7" />
+            <rect x="20" y="6" width="3" height="26" rx="1.5" fill="var(--logo-fill)" opacity="0.85" />
+            <rect x="28" y="11" width="3" height="21" rx="1.5" fill="var(--logo-fill)" opacity="0.55" />
+            <rect x="36" y="18" width="3" height="14" rx="1.5" fill="var(--logo-fill)" opacity="0.35" />
+            <line x1="2" y1="33.5" x2="40" y2="33.5" stroke="var(--logo-fill)" strokeWidth="1" opacity="0.3" />
           </svg>
           <span className="topbar-wordmark">Lumen</span>
         </div>

@@ -5,40 +5,38 @@ from __future__ import annotations
 from typing import Any
 
 LUMEN_PALETTE = [
-    "#3b5998",
-    "#c67a3c",
-    "#5a9e6f",
-    "#8b6caf",
-    "#c75a5a",
-    "#4a9cc2",
-    "#d4a843",
-    "#7d7d7d",
+    "#4A2D4F",
+    "#C2876E",
+    "#6B8F8A",
+    "#B8A44C",
+    "#8C7B6B",
+    "#A3667E",
 ]
 
 LUMEN_THEME: dict[str, Any] = {
     "config": {
-        "font": "Inter, system-ui, sans-serif",
+        "font": "DM Sans, system-ui, sans-serif",
         "axis": {
-            "labelFont": "Inter, system-ui, sans-serif",
-            "titleFont": "Inter, system-ui, sans-serif",
+            "labelFont": "DM Sans, system-ui, sans-serif",
+            "titleFont": "DM Sans, system-ui, sans-serif",
             "labelFontSize": 11,
             "titleFontSize": 12,
             "titleFontWeight": 600,
             "gridDash": [3, 3],
-            "gridColor": "#e0e0e0",
-            "domainColor": "#ccc",
-            "tickColor": "#ccc",
+            "gridColor": "#E8E5DF",
+            "domainColor": "#CCCAC5",
+            "tickColor": "#CCCAC5",
             "labelLimit": 150,
             "titlePadding": 12,
         },
         "legend": {
-            "labelFont": "Inter, system-ui, sans-serif",
-            "titleFont": "Inter, system-ui, sans-serif",
+            "labelFont": "DM Sans, system-ui, sans-serif",
+            "titleFont": "DM Sans, system-ui, sans-serif",
             "labelFontSize": 11,
             "titleFontSize": 12,
         },
         "title": {
-            "font": "Inter, system-ui, sans-serif",
+            "font": "DM Sans, system-ui, sans-serif",
             "fontSize": 14,
             "fontWeight": 600,
         },

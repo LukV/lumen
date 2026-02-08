@@ -61,14 +61,14 @@ export default function CodeView({ cell, onCellUpdate }: CodeViewProps) {
   ];
 
   return (
-    <div className="code-view">
+    <div className="code-block">
       {/* Tab bar */}
-      <div className="code-view__tabs">
+      <div className="code-tabs">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`code-view__tab ${activeTab === tab.key ? "code-view__tab--active" : ""}`}
+            className={`code-tab ${activeTab === tab.key ? "active" : ""}`}
           >
             {tab.label}
           </button>
@@ -76,43 +76,41 @@ export default function CodeView({ cell, onCellUpdate }: CodeViewProps) {
       </div>
 
       {/* Tab content */}
-      <div className="code-view__content">
-        {activeTab === "sql" && (
-          <div>
-            <textarea
-              value={editedSql}
-              onChange={(e) => setEditedSql(e.target.value)}
-              disabled={isRunning}
-              className="code-view__textarea"
-            />
-            <div className="code-view__actions">
-              <button
-                onClick={handleRun}
-                disabled={!sqlChanged || isRunning}
-                className="btn-run"
-              >
-                Run
-              </button>
-              {runStage && <StageIndicator stage={runStage} />}
-              {runError && (
-                <span className="code-view__run-error">{runError}</span>
-              )}
-            </div>
+      {activeTab === "sql" && (
+        <div>
+          <textarea
+            value={editedSql}
+            onChange={(e) => setEditedSql(e.target.value)}
+            disabled={isRunning}
+            className="code-textarea"
+          />
+          <div className="code-actions">
+            <button
+              onClick={handleRun}
+              disabled={!sqlChanged || isRunning}
+              className="btn-code-action primary"
+            >
+              Run
+            </button>
+            {runStage && <StageIndicator stage={runStage} />}
+            {runError && (
+              <span className="code-run-error">{runError}</span>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
-        {activeTab === "chart" && (
-          <pre className="code-view__pre">
-            {cell.chart ? JSON.stringify(cell.chart.spec, null, 2) : "No chart spec"}
-          </pre>
-        )}
+      {activeTab === "chart" && (
+        <div className="code-content">
+          {cell.chart ? JSON.stringify(cell.chart.spec, null, 2) : "No chart spec"}
+        </div>
+      )}
 
-        {activeTab === "reasoning" && (
-          <p className="code-view__reasoning">
-            {cell.metadata.reasoning || "No reasoning available"}
-          </p>
-        )}
-      </div>
+      {activeTab === "reasoning" && (
+        <div className="code-content code-content--reasoning">
+          {cell.metadata.reasoning || "No reasoning available"}
+        </div>
+      )}
     </div>
   );
 }

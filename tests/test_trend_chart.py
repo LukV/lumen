@@ -17,7 +17,7 @@ def test_trend_chart_actuals_layer() -> None:
     assert actuals["mark"]["type"] == "line"
     assert actuals["encoding"]["x"]["field"] == "dt"
     assert actuals["encoding"]["y"]["field"] == "val"
-    assert actuals["encoding"]["color"]["value"] == "#3b5998"
+    assert actuals["encoding"]["color"]["value"] == "#4A2D4F"
     # Actuals filter
     assert any("actual" in str(t.get("filter", "")) for t in actuals.get("transform", []))
 
@@ -27,7 +27,7 @@ def test_trend_chart_projections_layer() -> None:
     proj = spec["layer"][1]
     assert proj["mark"]["type"] == "line"
     assert proj["mark"]["strokeDash"] == [6, 4]
-    assert proj["encoding"]["color"]["value"] == "#c67a3c"
+    assert proj["encoding"]["color"]["value"] == "#C2876E"
     # Projections filter
     assert any("projected" in str(t.get("filter", "")) for t in proj.get("transform", []))
 

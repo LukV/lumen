@@ -104,7 +104,7 @@ def test_color_value_encoding_no_field() -> None:
         "mark": "bar",
         "encoding": {
             "x": {"field": "name", "type": "nominal"},
-            "color": {"value": "#3b5998"},
+            "color": {"value": "#4A2D4F"},
         },
     }
     result = validate_chart_spec(spec, ["name"])

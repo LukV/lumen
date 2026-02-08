@@ -16,7 +16,11 @@ export default function StageIndicator({ stage }: StageIndicatorProps) {
 
   return (
     <div className="stage-indicator">
-      <span className="stage-indicator__dot" />
+      <div className="processing-dots">
+        <span />
+        <span />
+        <span />
+      </div>
       {label}
     </div>
   );
