@@ -1,61 +1,24 @@
-import { useEffect, useState } from "react";
-import type { SchemaData } from "../types/schema";
+import { useState } from "react";
 
 interface InputBarProps {
+  variant: "hero" | "compact";
   onAsk: (question: string) => void;
   disabled: boolean;
   parentCellId?: string | null;
-  schema?: SchemaData | null;
-}
-
-function buildPlaceholders(schema: SchemaData): string[] {
-  const hints: string[] = [];
-  for (const table of schema.tables) {
-    const measures = table.columns.filter(
-      (c) => c.role === "measure_candidate"
-    );
-    const timeCols = table.columns.filter((c) => c.role === "time_dimension");
-    const cats = table.columns.filter((c) => c.role === "categorical");
-
-    if (timeCols.length > 0 && measures.length > 0) {
-      hints.push(
-        `Show monthly ${measures[0].name} trend from ${table.name}...`
-      );
-    }
-    if (cats.length > 0 && measures.length > 0) {
-      hints.push(
-        `Top 10 ${cats[0].name} by ${measures[0].name} in ${table.name}...`
-      );
-    }
-    if (hints.length >= 4) break;
-  }
-  return hints.length > 0 ? hints : ["Ask a question about your data..."];
 }
 
 export default function InputBar({
+  variant,
   onAsk,
   disabled,
   parentCellId,
-  schema,
 }: InputBarProps) {
   const [question, setQuestion] = useState("");
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
-  const placeholders =
+  const placeholder =
     parentCellId
-      ? ["Refine this analysis..."]
-      : schema
-        ? buildPlaceholders(schema)
-        : ["Ask a question about your data..."];
-
-  // Rotate placeholders every 4s
-  useEffect(() => {
-    if (placeholders.length <= 1) return;
-    const interval = setInterval(() => {
-      setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [placeholders.length]);
+      ? "Ask a follow-up question..."
+      : "Ask any question about your data...";
 
   const handleSubmit = () => {
     const trimmed = question.trim();
@@ -64,9 +27,9 @@ export default function InputBar({
     setQuestion("");
   };
 
-  return (
-    <div className="input-bar">
-      <div className="input-bar__inner">
+  if (variant === "hero") {
+    return (
+      <div className="hero-input-wrapper">
         <input
           type="text"
           value={question}
@@ -74,18 +37,41 @@ export default function InputBar({
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSubmit();
           }}
-          placeholder={placeholders[placeholderIndex % placeholders.length]}
+          placeholder={placeholder}
           disabled={disabled}
-          className="input-bar__input"
+          className="hero-input"
         />
         <button
           onClick={handleSubmit}
           disabled={disabled || !question.trim()}
-          className="btn-primary"
+          className="btn-ask"
         >
           Ask
         </button>
       </div>
+    );
+  }
+
+  return (
+    <div className="bottom-input-wrapper">
+      <input
+        type="text"
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSubmit();
+        }}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="bottom-input"
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={disabled || !question.trim()}
+        className="btn-ask-sm"
+      >
+        Ask
+      </button>
     </div>
   );
 }

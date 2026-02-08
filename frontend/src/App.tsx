@@ -42,6 +42,15 @@ function generateSuggestions(schema: SchemaData): string[] {
   return suggestions.slice(0, 4);
 }
 
+type Theme = "light" | "dark";
+
+function getInitialTheme(): Theme {
+  const stored = localStorage.getItem("lumen-theme");
+  if (stored === "light" || stored === "dark") return stored;
+  if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  return "light";
+}
+
 export default function App() {
   const [cells, setCells] = useState<Cell[]>([]);
   const [currentStage, setCurrentStage] = useState<string | null>(null);
@@ -49,9 +58,21 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [schema, setSchema] = useState<SchemaData | null>(null);
   const [health, setHealth] = useState<HealthData | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const resultsScrollRef = useRef<HTMLDivElement>(null);
 
   const lastCellId = cells.length > 0 ? cells[cells.length - 1].id : null;
+  const showResults = cells.length > 0 || isProcessing;
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("lumen-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
 
   // Load notebook, schema, and health on mount
   useEffect(() => {
@@ -84,9 +105,10 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Scroll to bottom when processing
   useEffect(() => {
-    if (isProcessing) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isProcessing && resultsScrollRef.current) {
+      resultsScrollRef.current.scrollTop = resultsScrollRef.current.scrollHeight;
     }
   }, [cells, currentStage, isProcessing]);
 
@@ -153,52 +175,85 @@ export default function App() {
   const connectionLabel = health?.database || health?.connection_name;
 
   return (
-    <div className="app-container">
-      {/* Header */}
-      <header className="header">
-        <div className="header-left">
-          <h1>Lumen</h1>
-          <p>Conversational Analytics</p>
+    <div className="app">
+      {/* Topbar */}
+      <header className="topbar">
+        <div className="topbar-left">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <rect x="1" y="10" width="2.4" height="7" rx="1" fill="var(--logo-fill)" />
+            <rect x="5" y="7" width="2.4" height="10" rx="1" fill="var(--logo-fill)" />
+            <rect x="9" y="4" width="2.4" height="13" rx="1" fill="var(--logo-fill)" />
+            <rect x="13" y="1" width="2.4" height="16" rx="1" fill="var(--logo-fill)" />
+          </svg>
+          <span className="topbar-wordmark">Lumen</span>
         </div>
-        {health !== null && (
-          <div className="connection-status">
-            <span
-              className={`status-dot ${isConnected ? "status-dot--connected" : "status-dot--disconnected"}`}
-            />
-            {isConnected
-              ? connectionLabel
-                ? `Connected to ${connectionLabel}`
-                : "Connected"
-              : "Not connected"}
-          </div>
-        )}
+        <div className="topbar-right">
+          {health !== null && (
+            <div className="conn-indicator">
+              <span
+                className={`conn-dot ${isConnected ? "conn-dot--connected" : "conn-dot--disconnected"}`}
+              />
+              {isConnected
+                ? connectionLabel
+                  ? connectionLabel
+                  : "Connected"
+                : "Not connected"}
+            </div>
+          )}
+          <button
+            className="theme-toggle"
+            onClick={toggleTheme}
+            title="Toggle theme"
+            aria-label="Toggle theme"
+          >
+            {theme === "light" ? (
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M13.5 9.2A5.5 5.5 0 016.8 2.5 6 6 0 1013.5 9.2z"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.3" />
+                <path
+                  d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
       </header>
 
-      {/* Empty state */}
-      {cells.length === 0 && !isProcessing && !error && (
-        <div className="empty-state">
-          <div className="empty-state__icon">&#9672;</div>
-          <h2 className="empty-state__title">Ask a question about your data</h2>
-          <p className="empty-state__subtitle">
-            Lumen turns natural language into SQL, charts, and insights.
+      {/* Empty state (hero view) */}
+      {!showResults && (
+        <div className="view-empty">
+          <h1 className="hero-title">
+            From question to insight
+            <br />
+            in one conversation.
+          </h1>
+          <p className="hero-sub">
+            Your thinking partner for reproducible data exploration.
           </p>
-          {schema && (
-            <p className="empty-state__schema-summary">
-              {schema.tables.length} table{schema.tables.length !== 1 ? "s" : ""} available
-              {schema.tables.length <= 6 && (
-                <>
-                  {": "}
-                  {schema.tables.map((t) => t.name).join(", ")}
-                </>
-              )}
-            </p>
-          )}
+          <InputBar
+            variant="hero"
+            onAsk={handleAsk}
+            disabled={isProcessing}
+            parentCellId={lastCellId}
+          />
           {suggestions.length > 0 && (
-            <div className="empty-state__suggestions">
+            <div className="sample-prompts">
               {suggestions.map((s, i) => (
                 <button
                   key={i}
-                  className="suggestion-chip"
+                  className="sample-chip"
                   onClick={() => handleAsk(s)}
                 >
                   {s}
@@ -209,37 +264,53 @@ export default function App() {
         </div>
       )}
 
-      {/* Cells */}
-      {cells.map((cell) => (
-        <CellView key={cell.id} cell={cell} onCellUpdate={handleCellUpdate} onCellDelete={handleCellDelete} />
-      ))}
+      {/* Results state */}
+      {showResults && (
+        <div className="view-results">
+          <div className="results-scroll" ref={resultsScrollRef}>
+            <div className="results-inner">
+              {cells.map((cell) => (
+                <CellView
+                  key={cell.id}
+                  cell={cell}
+                  theme={theme}
+                  onCellUpdate={handleCellUpdate}
+                  onCellDelete={handleCellDelete}
+                />
+              ))}
 
-      {/* Stage indicator */}
-      {currentStage && <StageIndicator stage={currentStage} />}
+              {/* Stage indicator */}
+              {currentStage && <StageIndicator stage={currentStage} />}
 
-      {/* Error */}
-      {error && (
-        <div className="app-error">
-          <span className="app-error__text">{error}</span>
-          <button
-            className="app-error__dismiss"
-            onClick={() => setError(null)}
-            aria-label="Dismiss error"
-          >
-            &times;
-          </button>
+              {/* Error */}
+              {error && (
+                <div className="app-error">
+                  <span className="app-error__text">{error}</span>
+                  <button
+                    className="app-error__dismiss"
+                    onClick={() => setError(null)}
+                    aria-label="Dismiss error"
+                  >
+                    &times;
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom input bar */}
+          <div className="bottom-input-bar">
+            <div className="bottom-input-inner">
+              <InputBar
+                variant="compact"
+                onAsk={handleAsk}
+                disabled={isProcessing}
+                parentCellId={lastCellId}
+              />
+            </div>
+          </div>
         </div>
       )}
-
-      <div ref={bottomRef} />
-
-      {/* Input */}
-      <InputBar
-        onAsk={handleAsk}
-        disabled={isProcessing}
-        parentCellId={lastCellId}
-        schema={schema}
-      />
     </div>
   );
 }
