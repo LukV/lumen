@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
@@ -17,7 +18,13 @@ from sse_starlette.sse import EventSourceResponse
 
 from lumen.agent.agent import ask_question, run_edited_sql
 from lumen.agent.cell import Cell
-from lumen.config import load_config, notebooks_dir
+from lumen.agent.suggestions import (
+    SuggestionsCache,
+    generate_suggestions,
+    load_cached_suggestions,
+    save_suggestions_cache,
+)
+from lumen.config import LumenConfig, load_config, notebooks_dir
 from lumen.notebook.notebook import Notebook
 from lumen.notebook.store import get_store
 from lumen.schema.cache import load_cached
@@ -37,6 +44,10 @@ app.add_middleware(
 
 # Cached schema context loaded on first request
 _schema_ctx: SchemaContext | None = None
+
+# Suggestion questions
+_suggestions: list[str] = []
+_suggestions_generating: bool = False
 
 
 async def _get_schema_ctx() -> SchemaContext | None:
@@ -59,9 +70,30 @@ def _sse_error(code: str, message: str) -> EventSourceResponse:
     return EventSourceResponse(_stream())
 
 
+async def _generate_suggestions_bg(schema_ctx: SchemaContext, config: LumenConfig) -> None:
+    """Generate suggestions in background thread and cache on success."""
+    global _suggestions, _suggestions_generating  # noqa: PLW0603
+    _suggestions_generating = True
+    try:
+        result = await asyncio.to_thread(generate_suggestions, schema_ctx, config)
+        if result.ok and result.data:
+            _suggestions = result.data
+            if config.active_connection:
+                cache = SuggestionsCache(schema_hash=schema_ctx.hash, suggestions=result.data)
+                save_suggestions_cache(config.active_connection, cache)
+                logger.info("Generated and cached %d suggestions", len(result.data))
+        else:
+            logger.warning("Suggestion generation failed: %s", result.diagnostics)
+    except Exception:
+        logger.exception("Error generating suggestions")
+    finally:
+        _suggestions_generating = False
+
+
 @app.on_event("startup")
 async def _startup() -> None:
     """Load the most recent notebook for the active connection on startup."""
+    global _suggestions  # noqa: PLW0603
     config = load_config()
     if not config.active_connection:
         return
@@ -77,6 +109,16 @@ async def _startup() -> None:
         store.set_notebook(nb)
         logger.info("Created new notebook %s for connection %s", nb.id, config.active_connection)
 
+    # Load or generate suggestions
+    schema_ctx = await load_cached(config.active_connection)
+    if schema_ctx:
+        cached = load_cached_suggestions(config.active_connection)
+        if cached and cached.schema_hash == schema_ctx.hash:
+            _suggestions = cached.suggestions
+            logger.info("Loaded %d cached suggestions", len(_suggestions))
+        else:
+            asyncio.create_task(_generate_suggestions_bg(schema_ctx, config))
+
 
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
@@ -87,6 +129,11 @@ async def health() -> dict[str, Any]:
     if _schema_ctx is not None:
         result["database"] = _schema_ctx.enriched.database
     return result
+
+
+@app.get("/api/suggestions")
+async def get_suggestions() -> dict[str, Any]:
+    return {"suggestions": _suggestions, "generating": _suggestions_generating}
 
 
 @app.get("/api/schema")

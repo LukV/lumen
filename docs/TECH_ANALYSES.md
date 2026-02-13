@@ -2,8 +2,6 @@
 
 **Purpose:** This document defines the architecture, tech stack, data structures, and implementation plan for Lumen v1 (Release Tufte). It is written to be precise enough to serve as input for Claude Code implementation.
 
-**Lineage:** Lumen descends from DuckBook, a prototype conversational analytics notebook built around a semantic layer and DuckDB. DuckBook was nuked because it was too bloated — it tried to be a full BI platform. Lumen strips that back to the core: connect to a database, ask a question, get a chart and a story. Specific DuckBook components are recuperated where noted.
-
 ---
 
 ## 1. System overview

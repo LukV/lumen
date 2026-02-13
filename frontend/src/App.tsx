@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Cell } from "./types/cell";
-import type { SchemaData } from "./types/schema";
 import { API_BASE } from "./config";
 import { consumeSSE } from "./utils/sse";
 import CellView from "./components/CellView";
@@ -13,33 +12,9 @@ interface HealthData {
   database?: string;
 }
 
-function generateSuggestions(schema: SchemaData): string[] {
-  const suggestions: string[] = [];
-  for (const table of schema.tables) {
-    const timeCols = table.columns.filter((c) => c.role === "time_dimension");
-    const measures = table.columns.filter(
-      (c) => c.role === "measure_candidate"
-    );
-    const cats = table.columns.filter((c) => c.role === "categorical");
-
-    if (timeCols.length > 0 && measures.length > 0) {
-      suggestions.push(
-        `Show monthly ${measures[0].name} trend from ${table.name}`
-      );
-    }
-    if (cats.length > 0 && measures.length > 0) {
-      suggestions.push(
-        `Top 10 ${cats[0].name} by ${measures[0].name} in ${table.name}`
-      );
-    }
-    if (measures.length >= 2) {
-      suggestions.push(
-        `Compare ${measures[0].name} vs ${measures[1].name} in ${table.name}`
-      );
-    }
-    if (suggestions.length >= 4) break;
-  }
-  return suggestions.slice(0, 4);
+function pickRandom<T>(arr: T[], n: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n);
 }
 
 type Theme = "light" | "dark";
@@ -56,7 +31,7 @@ export default function App() {
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [schema, setSchema] = useState<SchemaData | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [health, setHealth] = useState<HealthData | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const resultsScrollRef = useRef<HTMLDivElement>(null);
@@ -74,19 +49,36 @@ export default function App() {
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
   };
 
-  // Load notebook, schema, and health on mount
+  // Load notebook, suggestions, and health on mount
   useEffect(() => {
     fetch(`${API_BASE}/api/notebook`)
       .then((res) => res.json())
       .then((data: Cell[]) => setCells(data))
       .catch(() => {});
 
-    fetch(`${API_BASE}/api/schema`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { schema: SchemaData } | null) => {
-        if (data?.schema) setSchema(data.schema);
-      })
-      .catch(() => {});
+    const fetchSuggestions = () => {
+      fetch(`${API_BASE}/api/suggestions`)
+        .then((res) => res.json())
+        .then((data: { suggestions: string[]; generating: boolean }) => {
+          if (data.suggestions.length > 0) {
+            setSuggestions(pickRandom(data.suggestions, 5));
+          } else if (data.generating) {
+            // Retry once after 3s if still generating
+            setTimeout(() => {
+              fetch(`${API_BASE}/api/suggestions`)
+                .then((res) => res.json())
+                .then((retry: { suggestions: string[] }) => {
+                  if (retry.suggestions.length > 0) {
+                    setSuggestions(pickRandom(retry.suggestions, 5));
+                  }
+                })
+                .catch(() => {});
+            }, 3000);
+          }
+        })
+        .catch(() => {});
+    };
+    fetchSuggestions();
 
     fetch(`${API_BASE}/api/health`)
       .then((res) => res.json())
@@ -170,7 +162,6 @@ export default function App() {
     [lastCellId]
   );
 
-  const suggestions = schema ? generateSuggestions(schema) : [];
   const isConnected = health?.ok === true;
   const connectionLabel = health?.database || health?.connection_name;
 
