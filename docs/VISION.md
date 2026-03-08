@@ -30,7 +30,7 @@ Every visualization can be expanded to reveal the query and logic underneath it.
 
 When the chart uses the wrong date field or aggregation, the user says “break that down by quarter instead” or clicks to adjust — they do not start over. The analyst can also edit the generated SQL directly and re-run it, and Lumen respects those edits in the ongoing conversation. This is where most conversational analytics tools fail, and where Lumen must excel.
 
-3. Reproducibility
+### 3. Reproducibility
 
 Given the same question against the same data and schema, Lumen produces the same query, the same chart, the same narrative. The system resolves the user’s intent into a canonical intermediate representation — a SQL query, a declarative chart specification, a data-bound narrative template — that is deterministic and replayable independently of the LLM. Every insight is auditable and version-controllable. Switching models does not break past work.
 
@@ -52,15 +52,11 @@ The first chart a user sees sets the tone. Default colors, typography, and propo
 
 Beyond showing what happened, Lumen can hint at what could happen. A simple trend extrapolation with confidence intervals, a linear regression with clearly stated assumptions and R² values. This is not a headline feature — it is a surprise-and-delight moment. Every what-if output states its assumptions plainly, because that is what an analyst expects and what builds trust.
 
-### Local-first, transparent
-
-Lumen runs on the analyst’s laptop. No accounts, no cloud, no telemetry. Data never leaves the machine — which sidesteps one of the biggest trust barriers in enterprise analytics. The only exception is the LLM API call, and Lumen is fully transparent about exactly what is sent.
-
 ## WHAT WE BELIEVE
 
 We believe the “talk to your data” space is large and mostly fails because products optimize for breadth over trust. Lumen bets on depth: one data source, one interaction loop, done exceptionally well. We would rather support one database flawlessly than ten databases poorly.
 
-We believe the analyst, not the business user, is the right early adopter. Analysts are harder to impress but more forgiving of a narrow scope, because they understand the underlying complexity. Win them, and they become the distribution channel to their organizations.
+We believe the analyst is the right early adopter. Analysts are harder to impress but more forgiving of a narrow scope, because they understand the underlying complexity. Win them, and they become the distribution channel to their organizations.
 
 We believe reproducibility is a moat. Most conversational tools treat LLM output as the final artifact. Lumen treats it as a translation step. The artifact is a structured, deterministic object. This is harder to build but fundamentally more trustworthy — and it is what separates a notebook from a chatbot.
 
@@ -88,10 +84,6 @@ The user asks a question in natural language. Lumen generates SQL, executes it a
 
 Always available, one click to expand. The analyst can see the generated SQL, edit it, and re-run. Power users can also inspect the chart specification. Edits are respected in the conversation context. This is progressive disclosure: the default experience is conversational, the code is there when you need it.
 
-### Streaming and trust
-
-When a question is processing, Lumen shows the stages transparently: reading schema, generating query, executing, building visualization. Each stage has a subtle animation. No blank spinners. This is not just UX polish — it makes the process legible and builds trust. It also directly supports the explainability pillar.
-
 ### LLM integration
 
 Version 1 uses Claude’s API for natural language understanding, SQL generation, chart specification, and narrative writing via structured tool calling. The user can see exactly what is sent to the API at any time. Support for local models via Ollama is planned for a later release, but the quality gap currently makes it incompatible with Lumen’s core value proposition.
@@ -104,7 +96,7 @@ On connection, Lumen introspects the database and builds a semantic map: table n
 
 ### LLM orchestration
 
-The user’s question plus schema context is sent to Claude via structured tool calling. The model returns a SQL query, a chart specification (type, axes, grouping, formatting), and a narrative. Corrections and follow-ups include the conversation history to maintain context.
+The user’s question plus schema context is sent to the LLM via structured tool calling. The model returns a SQL query, a chart specification (type, axes, grouping, formatting), and a narrative. Corrections and follow-ups include the conversation history to maintain context.
 
 ### Execution engine
 
@@ -119,6 +111,12 @@ A declarative chart specification (aligned with Vega-Lite or Observable Plot) is
 A clean, minimal React application. Each conversation cell contains the question, the visualization, the narrative, and the collapsible code view. The interface prioritizes whitespace, typographic care, and responsiveness.
 
 ## LATER RELEASES
+
+### Streaming and trust
+
+When a question is processing, Lumen shows the stages transparently: reading schema, generating query, executing, building visualization. Each stage has a subtle animation. No blank spinners. This is not just UX polish — it makes the process legible and builds trust. It also directly supports the explainability pillar.
+
+
 
 These are deliberately out of scope for Release Tufte, but inform architectural decisions from day one:
 

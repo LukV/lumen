@@ -6,7 +6,7 @@
 
 ## 1. System overview
 
-Lumen is a local-first, single-user conversational analytics tool. The user connects to a PostgreSQL database, asks questions in natural language, and receives SQL-backed visualizations with written narratives. The system uses an agentic LLM orchestration loop but produces deterministic, replayable artifacts.
+Lumen at the time of the Tufte release is a local-first, single-user conversational analytics tool. The user connects to a PostgreSQL database, asks questions in natural language, and receives SQL-backed visualizations with written narratives. The system uses an agentic LLM orchestration loop but produces deterministic, replayable artifacts.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -82,7 +82,7 @@ Lumen is a local-first, single-user conversational analytics tool. The user conn
 
 - **No ORM** (SQLAlchemy, etc.) — we introspect schemas and execute generated SQL; an ORM adds indirection with no benefit
 - **No LangChain / LlamaIndex** — the agent loop is simple enough to implement directly; these frameworks add complexity and make debugging harder
-- **No semantic layer** (DuckBook's entities/explores/compiler) — Lumen is LLM-first; the LLM generates SQL directly from schema context. A rigid intermediate layer fights with the conversational nature. The DuckBook prototype proved that the semantic layer, while elegant, was too much abstraction for the use case.
+- **No semantic layer** — Lumen is LLM-first; the LLM generates SQL directly from schema context. A rigid intermediate layer fights with the conversational nature. The DuckBook prototype proved that the semantic layer, while elegant, was too much abstraction for the use case.
 - **No Docker in v1** — local-first means `uv pip install` and go
 - **No database for Lumen's own state** — JSON files are sufficient for single-user local notebooks
 
@@ -90,7 +90,7 @@ Lumen is a local-first, single-user conversational analytics tool. The user conn
 
 ## 3. Recuperated from DuckBook
 
-Five components from the DuckBook prototype are worth adapting. The rest is architecturally incompatible with Lumen's LLM-first approach.
+Five components from a previous prototype "Duckbook" are worth adapting. The rest is architecturally incompatible with Lumen's LLM-first approach.
 
 ### 3.1 `core.py` — Result[T] + Diag pattern
 
@@ -599,9 +599,7 @@ async def handle_question(question: str, notebook: Notebook, schema: SchemaConte
             "content": f"""The user asked: "{question}"
 
 This SQL was executed:
-```sql
 {plan['sql']}
-```
 
 Results ({execution.data.row_count} rows):
 {format_results_for_llm(execution.data)}
@@ -636,11 +634,10 @@ Also provide data_references mapping your claims to the data."""
 ```
 
 **Latency budget:** Call 1 (plan) ~2-3s + SQL execution ~0.1-1s + Call 2 (narrate) ~1-2s = **~3-6s total**. The streaming stages make this feel responsive. The narrate call is lighter (smaller context, shorter output) so it's fast.
-```
 
 ### System prompt (Call 1: plan)
 
-```
+```text
 You are Lumen, an analytical assistant. You answer questions about data
 by generating SQL queries and chart specifications.
 
@@ -781,8 +778,6 @@ AST validation is the first line. Additional layers:
 - **Read-only database user (hard requirement).** The setup instructions must create a Postgres user with only `SELECT` privileges. Lumen should verify this on connection by attempting a harmless write and confirming it's rejected. This is the real safety net — even if AST validation has a gap, the database won't execute writes.
 - **`SET statement_timeout = '30s'`** at connection level, non-overridable.
 - **asyncpg exceptions → Diag objects:** Wrap execution in try/except, converting Postgres error codes to structured diagnostics with column-level hints where available (e.g., "Column 'revnue' not found" → `hint: "Did you mean 'revenue'?"`).
-
----
 
 ## 8. Chart theming — Lumen default
 
