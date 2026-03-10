@@ -64,6 +64,7 @@ export interface CellMetadata {
 export interface Cell {
   id: string;
   created_at: string;
+  cell_type: "analysis" | "explanation";
   question: string;
   title: string;
   context: CellContext;

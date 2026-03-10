@@ -85,6 +85,7 @@ class CellMetadata(BaseModel):
 class Cell(BaseModel):
     id: str = Field(default_factory=generate_cell_id)
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    cell_type: str = "analysis"  # "analysis" | "explanation"
     question: str = ""
     title: str = ""
     context: CellContext = Field(default_factory=CellContext)

@@ -3,7 +3,7 @@
 Adapted from DuckBook's bootstrap/generator.py. Instead of building Entity
 objects, we tag columns with roles for the schema context XML.
 
-Roles: "key", "time_dimension", "categorical", "measure_candidate", "other"
+Roles: "key", "time_dimension", "categorical", "measure_candidate", "geographic_key", "other"
 """
 
 from __future__ import annotations
@@ -82,6 +82,9 @@ _DIMENSION_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+# Geographic key column patterns
+_GEO_KEY_PATTERNS = re.compile(r"^(nis|nis_code|gemeente_code|geo_code)$", re.IGNORECASE)
+
 _HIGH_CARDINALITY_RATIO = 0.9
 _LOW_CARDINALITY_THRESHOLD = 200
 
@@ -91,7 +94,7 @@ class EnrichedColumn(BaseModel):
     data_type: str
     is_nullable: bool = True
     comment: str | None = None
-    role: str = "other"  # key, time_dimension, categorical, measure_candidate, other
+    role: str = "other"  # key, time_dimension, categorical, measure_candidate, geographic_key, other
     is_primary_key: bool = False
     foreign_key: str | None = None
     distinct_estimate: int | None = None
@@ -171,6 +174,10 @@ def _normalize_type(col_type: str) -> str:
 def _classify_role(col: ColumnSnapshot, row_count: int) -> str:
     """Classify a column into a role."""
     norm = _normalize_type(col.data_type)
+
+    # Geographic key detection (before general key detection)
+    if _GEO_KEY_PATTERNS.match(col.name):
+        return "geographic_key"
 
     # Key detection: explicit PK/FK
     if col.is_primary_key:

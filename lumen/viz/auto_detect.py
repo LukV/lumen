@@ -6,10 +6,13 @@ EnrichedSchema to classify columns by role.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from lumen.schema.enricher import EnrichedSchema
 from lumen.viz.theme import LUMEN_PALETTE, apply_theme
+
+if TYPE_CHECKING:
+    from lumen.theme import ThemeConfig
 
 _PRIMARY = LUMEN_PALETTE[0]
 
@@ -18,6 +21,7 @@ def auto_detect_chart(
     columns: list[str],
     column_types: list[str],
     enriched: EnrichedSchema,
+    theme: ThemeConfig | None = None,
 ) -> dict[str, Any]:
     """Detect the best chart type and return a complete Vega-Lite spec.
 
@@ -58,40 +62,46 @@ def auto_detect_chart(
             else:
                 cat_cols.append(col)
 
+    # Rule 0: Geographic key + measure → bubble map
+    geo_col = _find_geo_column(columns, role_map)
+    if geo_col and measure_cols:
+        spec = _bubble_map_spec(geo_col, measure_cols[0])
+        return apply_theme(spec, theme)
+
     # Rule 1: No dims + single measure → KPI
     if not time_cols and not cat_cols and len(measure_cols) == 1:
         spec = _kpi_spec(measure_cols[0])
-        return apply_theme(spec)
+        return apply_theme(spec, theme)
 
     # Rule 2a: Time + 2+ measures → stacked area (fold transform)
     if time_cols and len(measure_cols) >= 2:
         spec = _stacked_area_spec(time_cols[0], measure_cols)
-        return apply_theme(spec)
+        return apply_theme(spec, theme)
 
     # Rule 2b: Time + 1 measure → line
     if time_cols and measure_cols:
         spec = _line_spec(time_cols[0], measure_cols[0])
-        return apply_theme(spec)
+        return apply_theme(spec, theme)
 
     # Rule 3: 1 categorical + measures → bar
     if cat_cols and measure_cols:
         spec = _bar_spec(cat_cols[0], measure_cols[0])
-        return apply_theme(spec)
+        return apply_theme(spec, theme)
 
     # Rule 4: 2+ numerics (no dims) → scatter
     if len(numeric_cols) >= 2:
         spec = _scatter_spec(numeric_cols[0], numeric_cols[1])
-        return apply_theme(spec)
+        return apply_theme(spec, theme)
 
     # Fallback → bar with first two columns
     if len(columns) >= 2:
         spec = _bar_spec(columns[0], columns[1])
-        return apply_theme(spec)
+        return apply_theme(spec, theme)
 
     # Single column fallback
     if columns:
         spec = _kpi_spec(columns[0])
-        return apply_theme(spec)
+        return apply_theme(spec, theme)
 
     return apply_theme({"mark": "text", "encoding": {}})
 
@@ -171,6 +181,69 @@ def _stacked_area_spec(time_col: str, measure_cols: list[str]) -> dict[str, Any]
         },
         "width": "container",
         "height": 300,
+    }
+
+
+_GEO_COLUMN_NAMES = frozenset({"nis", "nis_code", "gemeente_code", "geo_code"})
+
+
+def _find_geo_column(columns: list[str], role_map: dict[str, str]) -> str | None:
+    """Detect a geographic key column by name or role."""
+    for col in columns:
+        if role_map.get(col) == "geographic_key":
+            return col
+        if col.lower() in _GEO_COLUMN_NAMES:
+            return col
+    return None
+
+
+def _bubble_map_spec(geo_col: str, measure_col: str) -> dict[str, Any]:
+    return {
+        "width": "container",
+        "height": 450,
+        "projection": {"type": "mercator"},
+        "layer": [
+            {
+                "data": {"url": "/geo/vlaanderen-gemeenten.json"},
+                "mark": {"type": "circle", "color": "#ddd", "size": 8, "opacity": 0.4},
+                "encoding": {
+                    "latitude": {"field": "lat", "type": "quantitative"},
+                    "longitude": {"field": "lon", "type": "quantitative"},
+                },
+            },
+            {
+                "mark": {"type": "circle", "opacity": 0.75},
+                "transform": [
+                    {
+                        "lookup": geo_col,
+                        "from": {
+                            "data": {"url": "/geo/vlaanderen-gemeenten.json"},
+                            "key": "nis",
+                            "fields": ["lat", "lon", "gemeente"],
+                        },
+                    },
+                ],
+                "encoding": {
+                    "latitude": {"field": "lat", "type": "quantitative"},
+                    "longitude": {"field": "lon", "type": "quantitative"},
+                    "size": {
+                        "field": measure_col,
+                        "type": "quantitative",
+                        "scale": {"range": [20, 800]},
+                        "legend": {"title": measure_col},
+                    },
+                    "color": {
+                        "field": measure_col,
+                        "type": "quantitative",
+                        "scale": {"scheme": "teals"},
+                    },
+                    "tooltip": [
+                        {"field": "gemeente", "title": "Gemeente"},
+                        {"field": measure_col, "type": "quantitative", "format": ","},
+                    ],
+                },
+            },
+        ],
     }
 
 

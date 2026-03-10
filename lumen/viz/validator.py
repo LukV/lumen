@@ -6,7 +6,9 @@ from typing import Any
 
 from lumen.core import Result
 
-_VALID_MARK_TYPES = frozenset({"bar", "line", "point", "area", "rect", "text", "arc", "circle", "square", "tick"})
+_VALID_MARK_TYPES = frozenset(
+    {"bar", "line", "point", "area", "rect", "text", "arc", "circle", "square", "tick", "geoshape"}
+)
 _VALID_ENCODING_TYPES = frozenset({"nominal", "ordinal", "quantitative", "temporal"})
 
 
@@ -68,6 +70,9 @@ def _validate_single_spec(spec: dict[str, Any], columns: list[str]) -> Result[di
         result.error("CHART_INVALID_ENCODING", "Encoding must be an object")
         return result
 
+    # Check for lookup transform (map specs join external geo data)
+    has_geo_lookup = _has_geo_lookup(spec)
+
     # Validate encoded fields and types
     col_set = set(columns)
     for channel, enc_def in encoding.items():
@@ -75,9 +80,26 @@ def _validate_single_spec(spec: dict[str, Any], columns: list[str]) -> Result[di
             continue
         field = enc_def.get("field")
         if field and col_set and field not in col_set:
+            # Skip field validation for geo lookup fields (lat, lon, gemeente come from external data)
+            if has_geo_lookup and field in ("lat", "lon", "gemeente", "properties.naam", "properties.nis"):
+                continue
             result.error("CHART_UNKNOWN_FIELD", f"Field '{field}' in {channel} not in result columns: {columns}")
         enc_type = enc_def.get("type")
         if enc_type and enc_type not in _VALID_ENCODING_TYPES:
             result.error("CHART_INVALID_TYPE", f"Invalid encoding type '{enc_type}' in {channel}")
 
     return result
+
+
+def _has_geo_lookup(spec: dict[str, Any]) -> bool:
+    """Check if a spec uses a geographic lookup transform."""
+    transforms = spec.get("transform", [])
+    if isinstance(transforms, list):
+        for tr in transforms:
+            if isinstance(tr, dict) and "lookup" in tr:
+                from_data = tr.get("from", {})
+                if isinstance(from_data, dict):
+                    data = from_data.get("data", {})
+                    if isinstance(data, dict) and isinstance(data.get("url"), str) and "/geo/" in data["url"]:
+                        return True
+    return False

@@ -22,14 +22,17 @@ from lumen.agent.cell import (
 )
 from lumen.agent.executor import execute_query
 from lumen.agent.prompts import (
+    EXPLAIN_TOOL,
     NARRATE_TOOL,
     PLAN_TOOL,
+    build_explain_prompt,
     build_narrate_prompt,
     build_system_prompt,
 )
 from lumen.agent.sql_validator import validate_sql
 from lumen.config import LumenConfig
 from lumen.schema.context import SchemaContext
+from lumen.theme import load_theme
 from lumen.viz.auto_detect import auto_detect_chart
 from lumen.viz.theme import apply_theme
 from lumen.viz.validator import validate_chart_spec
@@ -100,13 +103,34 @@ async def ask_question(
                 parent_cell = c
                 break
 
+    theme = load_theme(config.active_connection)
     logger.info("ask_question: model=%s question=%r parent=%s", model, question, parent_cell_id)
 
-    # --- Call 1: Plan query ---
+    # --- Call 1: Plan or explain ---
     yield stage_event("thinking")
 
     system_prompt = build_system_prompt(schema_ctx, cells, parent_cell)
     messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
+
+    # First call: let LLM choose between plan_query and explain_schema
+    first_response = client.messages.create(  # type: ignore[call-overload]
+        model=model,
+        max_tokens=4096,
+        temperature=0,
+        system=system_prompt,
+        messages=messages,
+        tools=[PLAN_TOOL, EXPLAIN_TOOL],
+        tool_choice={"type": "any"},
+    )
+
+    # Check if LLM chose explain_schema
+    explain_input = _extract_tool_input(first_response, "explain_schema")
+    if explain_input is not None:
+        async for event in _handle_explanation(
+            client, model, question, explain_input, schema_ctx, cells, parent_cell_id, theme.locale
+        ):
+            yield event
+        return
 
     reasoning = ""
     sql = ""
@@ -114,21 +138,24 @@ async def ask_question(
     retry_count = 0
     agent_steps: list[str] = ["thinking"]
 
-    for attempt in range(MAX_RETRIES + 1):
-        response = client.messages.create(  # type: ignore[call-overload]
-            model=model,
-            max_tokens=4096,
-            temperature=0,
-            system=system_prompt,
-            messages=messages,
-            tools=[PLAN_TOOL],
-            tool_choice={"type": "tool", "name": "plan_query"},
-        )
+    # Extract plan_query from first response
+    tool_input = _extract_tool_input(first_response, "plan_query")
 
-        # Extract tool_use block
-        tool_input = _extract_tool_input(response, "plan_query")
+    for attempt in range(MAX_RETRIES + 1):
+        if attempt > 0:
+            response = client.messages.create(  # type: ignore[call-overload]
+                model=model,
+                max_tokens=4096,
+                temperature=0,
+                system=system_prompt,
+                messages=messages,
+                tools=[PLAN_TOOL],
+                tool_choice={"type": "tool", "name": "plan_query"},
+            )
+            tool_input = _extract_tool_input(response, "plan_query")
+
         if tool_input is None:
-            logger.error("LLM did not return plan_query tool call. Content: %s", response.content)
+            logger.error("LLM did not return plan_query tool call")
             yield error_event("LLM did not return a plan_query tool call")
             return
 
@@ -240,7 +267,8 @@ async def ask_question(
             periods_ahead=whatif_input.get("periods_ahead", 3),
             period_interval=whatif_input.get("period_interval", "month"),
         )
-        trend_result = build_trend_sql(sql, params=trend_params)
+        valid_cols = frozenset(cell_result.columns) if cell_result else None
+        trend_result = build_trend_sql(sql, params=trend_params, valid_columns=valid_cols)
 
         if trend_result.ok and trend_result.data is not None:
             # Re-execute with wrapped SQL
@@ -296,10 +324,11 @@ async def ask_question(
                 cell_result.columns,
                 cell_result.column_types,
                 schema_ctx.enriched,
+                theme=theme,
             )
             auto_detected = True
         else:
-            chart_spec = apply_theme(chart_spec)
+            chart_spec = apply_theme(chart_spec, theme=theme)
 
     # --- Call 2: Narrate results ---
     yield stage_event("narrating")
@@ -312,6 +341,7 @@ async def ask_question(
         sql,
         cell_result,
         caveats=whatif_caveats if is_whatif else None,
+        locale=theme.locale,
     )
 
     # --- Build Cell ---
@@ -382,17 +412,21 @@ async def run_edited_sql(
         return
 
     # Auto-detect chart for edited SQL
+    theme = load_theme(config.active_connection)
     chart_spec = auto_detect_chart(
         cell_result.columns,
         cell_result.column_types,
         schema_ctx.enriched,
+        theme=theme,
     )
 
     # Call 2: Narrate
     yield stage_event("narrating")
     client = anthropic.Anthropic(api_key=api_key)
     model = config.llm.model
-    narrative_text, data_references = await _narrate(client, model, original_cell.question, sql, cell_result)
+    narrative_text, data_references = await _narrate(
+        client, model, original_cell.question, sql, cell_result, locale=theme.locale
+    )
 
     # Build updated cell
     cell = Cell(
@@ -421,9 +455,10 @@ async def _narrate(
     sql: str,
     cell_result: CellResult,
     caveats: list[str] | None = None,
+    locale: str = "en",
 ) -> tuple[str, list[DataReference]]:
     """Run Call 2 (narrate_results) and return (text, references)."""
-    narrate_prompt = build_narrate_prompt(question, sql, cell_result, caveats=caveats)
+    narrate_prompt = build_narrate_prompt(question, sql, cell_result, caveats=caveats, locale=locale)
     narrate_response = client.messages.create(  # type: ignore[call-overload]
         model=model,
         max_tokens=1024,
@@ -451,6 +486,49 @@ async def _narrate(
             )
 
     return narrative_text, data_references
+
+
+async def _handle_explanation(
+    client: anthropic.Anthropic,
+    model: str,
+    question: str,
+    explain_input: dict[str, Any],
+    schema_ctx: SchemaContext,
+    cells: list[Cell] | None,
+    parent_cell_id: str | None,
+    locale: str,
+) -> AsyncGenerator[SSEEvent]:
+    """Handle an explanation question — no SQL, no chart, just narrative."""
+    reasoning = explain_input.get("reasoning", "")
+    narrative_text = explain_input.get("narrative", "")
+
+    # If the first call didn't include a narrative (shouldn't happen, but be safe), do a second call
+    if not narrative_text:
+        explain_prompt = build_explain_prompt(question, schema_ctx, locale=locale, cells=cells)
+        explain_response = client.messages.create(  # type: ignore[call-overload]
+            model=model,
+            max_tokens=2048,
+            temperature=0,
+            system=explain_prompt,
+            messages=[{"role": "user", "content": question}],
+            tools=[EXPLAIN_TOOL],
+            tool_choice={"type": "tool", "name": "explain_schema"},
+        )
+        fallback_input = _extract_tool_input(explain_response, "explain_schema")
+        if fallback_input:
+            reasoning = fallback_input.get("reasoning", reasoning)
+            narrative_text = fallback_input.get("narrative", "")
+
+    cell = Cell(
+        cell_type="explanation",
+        question=question,
+        context=CellContext(parent_cell_id=parent_cell_id, refinement_of=parent_cell_id),
+        narrative=CellNarrative(text=narrative_text),
+        metadata=CellMetadata(model=model, agent_steps=["thinking"], reasoning=reasoning),
+    )
+
+    logger.info("Explanation cell built: id=%s", cell.id)
+    yield cell_event(cell)
 
 
 def _extract_tool_input(response: Any, tool_name: str) -> dict[str, Any] | None:

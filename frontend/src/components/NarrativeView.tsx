@@ -1,4 +1,9 @@
+import { useMemo } from "react";
+import { marked } from "marked";
 import type { DataReference } from "../types/cell";
+
+// Configure marked for inline use: no <p> wrapping, no sanitization needed (trusted LLM output)
+marked.use({ breaks: true });
 
 interface NarrativeViewProps {
   text: string;
@@ -28,6 +33,18 @@ export default function NarrativeView({
   highlightedDatum,
 }: NarrativeViewProps) {
   if (!text) return null;
+
+  const html = useMemo(() => marked.parse(text) as string, [text]);
+
+  // If no data references, render as parsed markdown
+  if (dataReferences.length === 0) {
+    return (
+      <div
+        className="narrative narrative--markdown"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  }
 
   // Build highlighted narrative by replacing data reference text with styled spans
   const parts: { text: string; ref: DataReference | null }[] = [];

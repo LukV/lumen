@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { Cell } from "../types/cell";
 import { API_BASE } from "../config";
+import { t } from "../locales";
 import ChartRenderer from "./ChartRenderer";
 import CodeView from "./CodeView";
 import NarrativeView from "./NarrativeView";
@@ -79,8 +80,10 @@ export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: Ce
     }
   };
 
+  const isExplanation = cell.cell_type === "explanation";
+
   return (
-    <div className="cell">
+    <div className={`cell ${isExplanation ? "cell--explanation" : ""}`}>
       {/* Cell body */}
       <div className="cell-body">
         {/* Title header */}
@@ -104,10 +107,10 @@ export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: Ce
             </h3>
           )}
           {cell.metadata.whatif && (
-            <span className="cell__badge cell__badge--projection">projection</span>
+            <span className="cell__badge cell__badge--projection">{t("cell.projection")}</span>
           )}
           {cell.sql?.edited_by_user && (
-            <span className="cell__badge">edited</span>
+            <span className="cell__badge">{t("cell.edited")}</span>
           )}
           <button
             className="cell__delete-btn"
@@ -118,8 +121,8 @@ export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: Ce
           </button>
         </div>
 
-        {/* Error banner */}
-        {hasErrors && (
+        {/* Analysis-only: error, empty, chart */}
+        {!isExplanation && hasErrors && (
           <div className="error-banner">
             <div className="error-banner__content">
               {cell.result?.diagnostics
@@ -136,15 +139,13 @@ export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: Ce
           </div>
         )}
 
-        {/* Empty results */}
-        {emptyResult && (
+        {!isExplanation && emptyResult && (
           <div className="cell__empty-results">
             Query returned no results. Try broadening your filters.
           </div>
         )}
 
-        {/* Chart */}
-        {cell.chart && hasData && (
+        {!isExplanation && cell.chart && hasData && (
           <div className="cell__chart">
             <ChartRenderer
               spec={cell.chart.spec}
@@ -166,14 +167,14 @@ export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: Ce
           </div>
         )}
 
-        {/* Caveats */}
-        {cell.metadata.whatif?.caveats && cell.metadata.whatif.caveats.length > 0 && (
+        {/* Caveats (analysis only) */}
+        {!isExplanation && cell.metadata.whatif?.caveats && cell.metadata.whatif.caveats.length > 0 && (
           <div className="cell__caveats">
             <button
               onClick={() => setShowCaveats(!showCaveats)}
               className="cell__caveats-toggle"
             >
-              {showCaveats ? "Hide assumptions" : "View assumptions"}
+              {showCaveats ? "Hide assumptions" : t("cell.caveats")}
             </button>
             {showCaveats && (
               <ul className="cell__caveats-list">
@@ -186,8 +187,8 @@ export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: Ce
         )}
       </div>
 
-      {/* Footer strip */}
-      {cell.sql && (
+      {/* Footer strip (analysis only) */}
+      {!isExplanation && cell.sql && (
         <div className="cell-footer">
           <div className="cell-footer-left">
             <button
@@ -195,13 +196,13 @@ export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: Ce
               onClick={() => setShowCode(!showCode)}
             >
               <span className={`arrow ${showCode ? "open" : ""}`}>&#9656;</span>
-              {showCode ? "Hide code" : "Show code"}
+              {showCode ? "Hide code" : t("cell.code")}
             </button>
           </div>
           <div className="cell-meta-strip">
             {cell.result && (
               <>
-                <span>{cell.result.row_count} rows</span>
+                <span>{cell.result.row_count} {t("cell.rows")}</span>
                 <span className="sep" />
                 <span>{cell.result.execution_time_ms}ms</span>
               </>
@@ -216,8 +217,8 @@ export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: Ce
         </div>
       )}
 
-      {/* Code drawer */}
-      {cell.sql && (
+      {/* Code drawer (analysis only) */}
+      {!isExplanation && cell.sql && (
         <div className={`code-drawer ${showCode ? "open" : ""}`}>
           <CodeView cell={cell} onCellUpdate={onCellUpdate} />
         </div>

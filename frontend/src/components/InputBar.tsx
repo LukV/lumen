@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t } from "../locales";
 
 interface InputBarProps {
   variant: "hero" | "compact";
@@ -15,10 +16,9 @@ export default function InputBar({
 }: InputBarProps) {
   const [question, setQuestion] = useState("");
 
-  const placeholder =
-    parentCellId
-      ? "Ask a follow-up question..."
-      : "Ask any question about your data...";
+  const placeholder = parentCellId
+    ? t("input.placeholder.followup")
+    : t("input.placeholder");
 
   const handleSubmit = () => {
     const trimmed = question.trim();
@@ -46,7 +46,7 @@ export default function InputBar({
           disabled={disabled || !question.trim()}
           className="btn-ask"
         >
-          Ask
+          {t("input.submit")}
         </button>
       </div>
     );
@@ -70,7 +70,7 @@ export default function InputBar({
         disabled={disabled || !question.trim()}
         className="btn-ask-sm"
       >
-        Ask
+        {t("input.submit")}
       </button>
     </div>
   );

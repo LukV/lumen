@@ -1,6 +1,6 @@
 # Lumen — Technical Documentation
 
-**Release Tufte** — v0.1.0
+**Release Tufte** — v0.1.0 (shipped) | **Release Proef** — v0.2.0 (planned)
 
 This document describes the architecture, data flow, and implementation details of Lumen as built. It serves as the definitive technical reference for the codebase.
 
@@ -55,7 +55,7 @@ Lumen is a local-first, single-user conversational analytics tool. The user conn
 | Database driver | asyncpg | Async Postgres, statement timeout enforcement |
 | SQL validation | pglast | Postgres parser — AST walk catches DML in CTEs |
 | Chart spec | Vega-Lite v5 JSON | Declarative, deterministic rendering |
-| Frontend | React 18 + TypeScript + Vite | `react-vega` for chart rendering |
+| Frontend | React 19 + TypeScript + Vite | `react-vega` for chart rendering |
 | Streaming | Server-Sent Events | Unidirectional, sufficient for v1 |
 | Storage | JSON files on disk | `~/.lumen/notebooks/` — no metadata DB needed |
 | Schema docs | YAML / Markdown / CSV parsers | dbt `schema.yml`, freeform docs, data dictionaries |
@@ -656,3 +656,337 @@ react, react-dom, react-vega, vega, vega-lite, vega-embed, typescript, vite, @vi
 4. **No cell re-execution** — there is no endpoint to re-run a cell against current data with its stored SQL. The user can copy-paste SQL into the editor to re-run.
 5. **No SQL syntax highlighting** — the code view uses a plain textarea, not a syntax-highlighted editor.
 6. **Single-threaded LLM calls** — the Anthropic client is synchronous (called from async context). This is fine for single-user but would need async wrapping for concurrent users.
+
+---
+
+## Technical improvement opportunities
+
+Identified during code review ahead of Release Proef. Organized by priority and effort. These should be addressed alongside or before Proef feature work, as several are prerequisites for a client deployment.
+
+### P0 — Fix before client deployment
+
+#### Introspector N+1 query pattern (performance)
+
+**File:** `lumen/schema/introspector.py:142-220`
+
+The per-column metadata loop issues individual queries for distinct counts, sample values, and min/max ranges. For the LVTM dataset (~30 tables, ~200 columns), this generates ~600 sequential queries with network latency per query.
+
+**Current:**
+```python
+for tname, table in tables_dict.items():
+    for col in table.columns:
+        dist_row = await conn.fetchrow(
+            f'SELECT COUNT(DISTINCT "{col.name}") AS dc FROM "{tname}"'
+        )
+```
+
+**Fix:** Batch queries per table or use `pg_stats` for pre-computed statistics:
+```python
+# Use pg_stats for distinct counts (no table scan needed)
+SELECT tablename, attname, n_distinct
+FROM pg_stats WHERE schemaname = $1
+
+# Batch sample values per table
+SELECT column_name, array_agg(DISTINCT value) ...
+```
+
+Table comments (line 142-155) and column comments (line 157-177) also use per-table queries. These can be batched into single `obj_description()`/`col_description()` queries.
+
+**Impact:** Reduces introspection time from O(tables × columns) queries to O(tables) or O(1). Critical for schemas with 100+ columns.
+
+#### SQL field name injection in trend SQL (security)
+
+**File:** `lumen/whatif/trend.py:54-109`
+
+`TrendParams.time_field` and `TrendParams.measure` come from LLM output (user-influenced) and are interpolated into SQL via f-strings with double-quoting:
+
+```python
+epoch_expr = f'EXTRACT(EPOCH FROM "{time_col}"::timestamp) / 86400.0'
+```
+
+Double-quoted identifiers prevent most injection, but do not handle embedded quotes. A field name containing `"` breaks out of the identifier.
+
+**Fix:** Validate field names against the schema's known columns before constructing SQL:
+```python
+valid_cols = {col.name for table in schema.tables for col in table.columns}
+if params.time_field not in valid_cols:
+    result.error("TREND_INVALID_FIELD", f"Unknown column: {params.time_field}")
+```
+
+The same pattern exists in `introspector.py:185,200,210` (column/table names in f-string SQL). These are sourced from `information_schema` (trusted), so lower risk, but should use the same validation pattern for consistency.
+
+#### Executor fetches all rows before truncating (memory)
+
+**File:** `lumen/agent/executor.py:37,47-49`
+
+```python
+rows = await conn.fetch(sql)           # Loads ALL rows into RAM
+if len(rows) > max_rows:
+    rows = rows[:max_rows]             # Truncates after the fact
+```
+
+A query returning 1M rows loads everything into memory before truncating to 1000. For the LVTM dataset this is unlikely to be a problem (small tables), but it is a correctness issue.
+
+**Fix:** Wrap the user's SQL with a LIMIT to prevent runaway fetches:
+```python
+wrapped = f"SELECT * FROM ({sql}) AS _q LIMIT {max_rows + 1}"
+rows = await conn.fetch(wrapped)
+```
+
+The `+1` detects truncation without fetching more than needed.
+
+#### Deprecated FastAPI startup event
+
+**File:** `lumen/server.py:93`
+
+```python
+@app.on_event("startup")  # Deprecated in FastAPI >=0.109
+```
+
+FastAPI warns about this in test output. Replace with lifespan context manager:
+```python
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await _startup()
+    yield
+
+app = FastAPI(title="Lumen", version="0.2.0", lifespan=lifespan)
+```
+
+### P1 — Address during Proef development
+
+#### Global mutable state in server
+
+**Files:** `lumen/server.py:46-50`, `lumen/notebook/store.py:122-138`
+
+Three pieces of global state without synchronization:
+
+```python
+_schema_ctx: SchemaContext | None = None       # server.py:46
+_suggestions: list[str] = []                    # server.py:49
+_suggestions_generating: bool = False           # server.py:50
+_store: NotebookStore | None = None            # store.py:122
+```
+
+**Problems:**
+- No `asyncio.Lock` — concurrent requests can race on `_suggestions_generating`
+- `_schema_ctx` is loaded once at startup, never refreshed
+- `get_store()` accepts `notebooks_dir` on first call only; ignored on subsequent calls
+- `reset_store()` exists solely for testing — indicates the singleton is hard to test
+
+**Fix for Proef:** Replace with FastAPI dependency injection:
+```python
+async def get_schema_ctx(config: LumenConfig = Depends(get_config)) -> SchemaContext:
+    ...
+
+@app.post("/api/ask")
+async def ask(request: AskRequest, ctx: SchemaContext = Depends(get_schema_ctx)):
+    ...
+```
+
+This is a prerequisite for connection management via UI (the schema context must be reloadable).
+
+#### Synchronous LLM calls in async context
+
+**Files:** `lumen/agent/agent.py:118,427`, `lumen/agent/suggestions.py:82`
+
+The Anthropic SDK client is synchronous. `agent.py` calls `client.messages.create()` directly in async generator functions, blocking the event loop:
+
+```python
+response = client.messages.create(...)  # Blocks entire server
+```
+
+`suggestions.py` correctly uses `asyncio.to_thread()` (server.py:78), but `agent.py` does not.
+
+**Fix:** Use the async Anthropic client:
+```python
+client = anthropic.AsyncAnthropic(api_key=api_key)
+response = await client.messages.create(...)
+```
+
+This is a prerequisite for streaming reasoning (Proef 2.3) — streaming requires the async client's `client.messages.stream()`.
+
+#### Column type inference from Python types
+
+**File:** `lumen/agent/executor.py:54`
+
+```python
+column_types = [type(rows[0][col]).__name__ for col in columns]
+```
+
+Returns Python type names (`int`, `Decimal`, `datetime`) instead of Postgres type names (`integer`, `numeric`, `timestamp`). Auto-detect heuristics in `auto_detect.py` compare against these types, creating a fragile coupling.
+
+**Problems:**
+- `datetime` maps to `datetime` not `timestamp` — time dimension detection works by accident
+- `NoneType` appears when first row has NULL — breaks type inference entirely
+- `Decimal` vs `float` behavior differs between Postgres numeric types
+
+**Fix:** Use asyncpg's `PreparedStatement.get_attributes()` to get Postgres column types:
+```python
+stmt = await conn.prepare(sql)
+column_types = [attr.type.name for attr in stmt.get_attributes()]
+rows = await stmt.fetch(max_rows + 1)
+```
+
+#### Unvalidated LLM tool output
+
+**File:** `lumen/agent/agent.py:135-138`
+
+```python
+reasoning = tool_input.get("reasoning", "")
+sql = tool_input.get("sql", "")
+chart_spec = tool_input.get("chart_spec", {})
+whatif_input: dict[str, Any] | None = tool_input.get("whatif")
+```
+
+Tool output is extracted as `dict[str, Any]` with no Pydantic validation. If the LLM returns unexpected types (e.g., `sql` as a list), errors surface downstream with confusing messages.
+
+**Fix:** Define a Pydantic model for tool input:
+```python
+class PlanToolOutput(BaseModel):
+    reasoning: str
+    sql: str
+    chart_spec: dict[str, Any]
+    whatif: WhatIfInput | None = None
+
+parsed = PlanToolOutput.model_validate(tool_input)
+```
+
+### P2 — Quality improvements
+
+#### SSE client has no error recovery
+
+**File:** `frontend/src/utils/sse.ts:8-55`
+
+The SSE consumer reads the stream once with no reconnection, no timeout, and no abort support. If the server drops the connection mid-stream, the client hangs silently.
+
+**Problems:**
+- No `AbortController` integration — component unmount during streaming leaks the reader
+- No timeout — a stalled server blocks indefinitely
+- No reconnection logic — network blips kill the interaction
+
+**Fix:** Accept an `AbortSignal` and propagate it:
+```typescript
+export async function consumeSSE(
+  response: Response,
+  handlers: SSEHandlers,
+  signal?: AbortSignal
+): Promise<void> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  signal?.addEventListener("abort", () => reader.cancel());
+  ...
+}
+```
+
+#### No responsive design
+
+**File:** `frontend/src/styles.css`
+
+929 lines of CSS with zero media queries. The UI is designed for desktop only:
+- `.hero-title` is 34px — unreadable on mobile
+- `.results-inner` max-width 820px — fine, but padding (32px) is excessive on small screens
+- `.topbar` padding 28px — wastes space on mobile
+- `.sample-chip` has `white-space: nowrap` — overflows on narrow screens
+
+**Fix:** Add breakpoints for mobile (< 640px) and tablet (640-1024px). Start with padding/font adjustments, not layout changes.
+
+#### Missing keyboard accessibility
+
+**Files:** `frontend/src/components/CellView.tsx`, `frontend/src/styles.css`
+
+- Cell title editing requires double-click — no keyboard alternative (`CellView.tsx:100`)
+- Delete button is hidden until hover (`styles.css:502`) — invisible to keyboard users
+- Theme toggle has no visible focus state (`styles.css:200-216`)
+- No focus management after cell creation — user must tab through all cells
+
+#### Silent error swallowing in frontend
+
+**File:** `frontend/src/App.tsx:57,75,79,117`
+
+Multiple `.catch(() => {})` blocks silently discard errors:
+
+```javascript
+fetch(`${API_BASE}/api/notebook`)
+  .then((res) => res.json())
+  .then((data: Cell[]) => setCells(data))
+  .catch(() => {});                          // User sees empty page
+```
+
+If the backend is down on initial load, the user sees an empty page with no indication of failure.
+
+#### Health endpoint always returns ok
+
+**File:** `lumen/server.py:123-131`
+
+```python
+@app.get("/api/health")
+async def health() -> dict[str, Any]:
+    config = load_config()
+    result: dict[str, Any] = {"ok": True}    # Always true
+```
+
+Should verify Postgres connectivity, schema cache existence, or at minimum that an active connection is configured.
+
+#### Numpy dependency appears unused
+
+**File:** `pyproject.toml:22`
+
+```toml
+"numpy>=2.2",
+```
+
+No `import numpy` found in the codebase. If unused, this adds ~50MB to the installation. Verify and remove if not needed.
+
+### Test coverage gaps
+
+#### Missing test files
+
+| Module | Status | Risk |
+|--------|--------|------|
+| `lumen/agent/executor.py` | No dedicated tests | All agent tests mock it — real asyncpg behavior untested |
+| `lumen/schema/introspector.py` | No tests | Core functionality, all database interaction untested |
+| `lumen/cli.py` | No tests | Config loading, connect flow untested |
+| `lumen/agent/prompts.py` | No direct tests | XML prompt construction only tested indirectly via mocked LLM responses |
+| `lumen/server.py` (endpoints) | Partial | Only PATCH/DELETE tested; POST /api/ask, POST /api/run-sql, GET /api/schema untested |
+| Frontend | No tests | No React component tests |
+
+#### Missing edge case tests
+
+- Empty schema (zero tables) — untested path through enricher and context
+- NULL values in first row — breaks `executor.py:54` type inference
+- `distinct_estimate=0` — untested path through `enricher.py`
+- Schema with reserved SQL keywords as column/table names
+- Concurrent cell creation — no test for race conditions in `NotebookStore`
+- Corrupt notebook JSON recovery — `load_latest()` logs warning but behavior untested
+- SSE stream interruption — no test for partial stream delivery
+
+#### Test quality observations
+
+**Strengths:**
+- 153 tests, all passing, covering core Result[T], SQL validation, cell models, history, augmentation, auto-detect, trend SQL, chart building, and notebook persistence
+- Error paths tested alongside happy paths in most modules
+- Deterministic hashing and XML escaping well-tested
+
+**Weaknesses:**
+- `test_agent.py` uses hardcoded mock responses — doesn't verify actual tool schemas match LLM expectations
+- `test_augmenter.py:84` malformed YAML test uses `{{invalid yaml: [` which is actually valid YAML
+- `test_notebook_persistence.py:100-105` atomic write test only checks for `.tmp` file absence, doesn't verify atomicity under failure
+- Index-based keys in frontend (`key={i}`) — anti-pattern for dynamic lists
+
+### Architecture notes for Proef
+
+These aren't bugs — they're architectural decisions from Release Tufte that need revisiting for Proef's scope.
+
+**Connection lifecycle.** Currently, the DSN is resolved per-request via `_get_dsn(config)` → `config.connections[name].dsn`, and a new `asyncpg.connect()` is created per query execution. This works for single-user but creates unnecessary connection overhead. For Proef, consider a connection pool (`asyncpg.create_pool()`) initialized at startup with the active connection.
+
+**Theme as code vs config.** The current theme (`viz/theme.py`) is hardcoded Python returning a Vega-Lite config dict. For Proef's branding feature, the theme must be driven by the `theme.json` configuration. The Vega-Lite palette, the CSS custom properties, and the chart colors must all derive from the same source of truth.
+
+**Locale architecture.** Release Proef adds Dutch UI chrome. The simplest approach: a `locales/` directory with `nl.json` and `en.json`, loaded at build time, with the locale set in `theme.json`. No runtime switching. The LLM system prompt's language directive should read from the same config.
+
+**Streaming architecture for reasoning.** The current SSE flow emits discrete `stage` events. Streaming reasoning requires a new SSE event type (`reasoning` with incremental text chunks). This requires the async Anthropic client (`client.messages.stream()`) to receive token-by-token output. The frontend needs a new UI component for the reasoning stream — not a chat bubble, but a collapsible monospaced panel below the stage indicator.
+
+**Geographic visualization.** Vega-Lite supports choropleth maps natively via `mark: "geoshape"` with TopoJSON/GeoJSON projections. The key decision is where the GeoJSON lives: bundled as a static asset in the frontend (simplest), or served from the backend (more flexible for future boundary sets). For Proef, bundle it — the Vlaamse gemeenten GeoJSON is ~1MB and changes rarely.

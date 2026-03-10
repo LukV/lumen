@@ -26,7 +26,12 @@ class TrendSQL(BaseModel):
     period_interval: str
 
 
-def build_trend_sql(baseline_sql: str, *, params: TrendParams) -> Result[TrendSQL]:
+def build_trend_sql(
+    baseline_sql: str,
+    *,
+    params: TrendParams,
+    valid_columns: frozenset[str] | None = None,
+) -> Result[TrendSQL]:
     """Wrap baseline SQL with linear regression and future period projection.
 
     Uses Postgres regr_slope()/regr_intercept()/regr_r2() with EXTRACT(EPOCH FROM ...)
@@ -42,6 +47,22 @@ def build_trend_sql(baseline_sql: str, *, params: TrendParams) -> Result[TrendSQ
             hint=f"Must be one of: {', '.join(sorted(_VALID_INTERVALS))}",
         )
         return result
+
+    if valid_columns is not None:
+        if params.time_field not in valid_columns:
+            result.error(
+                "TREND_INVALID_FIELD",
+                f"Unknown time field: '{params.time_field}'",
+                hint=f"Available columns: {', '.join(sorted(valid_columns))}",
+            )
+            return result
+        if params.measure not in valid_columns:
+            result.error(
+                "TREND_INVALID_FIELD",
+                f"Unknown measure field: '{params.measure}'",
+                hint=f"Available columns: {', '.join(sorted(valid_columns))}",
+            )
+            return result
 
     periods = params.periods_ahead
     if periods < 1 or periods > _MAX_PERIODS:

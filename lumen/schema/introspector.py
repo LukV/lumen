@@ -139,24 +139,24 @@ async def introspect(dsn: str, schema_name: str = "public") -> Result[SchemaSnap
             if tname in tables_dict:
                 tables_dict[tname].row_count = max(0, int(row["row_count"]))
 
-        # 5. Table comments
-        for tname, table in tables_dict.items():
-            comment_row = await conn.fetchrow(
-                """
-                SELECT obj_description(c.oid)
-                FROM pg_class c
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE c.relname = $1 AND n.nspname = $2
-                """,
-                tname,
-                schema_name,
-            )
-            if comment_row and comment_row[0]:
-                table.comment = str(comment_row[0])
+        # 5. Table comments (batched)
+        comment_rows = await conn.fetch(
+            """
+            SELECT c.relname AS table_name, obj_description(c.oid) AS comment
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = $1 AND c.relkind IN ('r', 'v', 'p')
+            """,
+            schema_name,
+        )
+        for row in comment_rows:
+            tname = str(row["table_name"])
+            if tname in tables_dict and row["comment"]:
+                tables_dict[tname].comment = str(row["comment"])
 
-        # 5b. Column comments
+        # 5b. Column comments (per-table, col_description requires regclass)
         for tname, table in tables_dict.items():
-            qualified = f"{schema_name}.{tname}"
+            qualified = f'"{schema_name}"."{tname}"'
             col_comment_rows = await conn.fetch(
                 """
                 SELECT column_name, col_description($1::regclass, ordinal_position)
@@ -176,20 +176,32 @@ async def introspect(dsn: str, schema_name: str = "public") -> Result[SchemaSnap
                         if col.name == cname:
                             col.comment = str(desc)
 
-        # Per-column introspection (distinct counts, sample values, ranges)
+        # 6. Distinct count estimates (batched via pg_stats)
+        stats_rows = await conn.fetch(
+            """
+            SELECT s.tablename, s.attname,
+                   CASE WHEN s.n_distinct >= 0 THEN s.n_distinct::bigint
+                        ELSE (abs(s.n_distinct) * c.reltuples)::bigint END AS estimated_distinct
+            FROM pg_stats s
+            JOIN pg_class c ON c.relname = s.tablename
+            WHERE s.schemaname = $1
+              AND c.relnamespace = $1::regnamespace
+            """,
+            schema_name,
+        )
+        distinct_lookup: dict[tuple[str, str], int] = {}
+        for row in stats_rows:
+            distinct_lookup[(str(row["tablename"]), str(row["attname"]))] = int(row["estimated_distinct"])
+
         for tname, table in tables_dict.items():
             for col in table.columns:
-                # 6. Distinct count estimates
-                try:
-                    dist_row = await conn.fetchrow(
-                        f'SELECT COUNT(DISTINCT "{col.name}") AS dc FROM "{tname}"'  # noqa: S608
-                    )
-                    if dist_row:
-                        col.distinct_estimate = int(dist_row["dc"])
-                except Exception:
-                    logger.debug("Could not get distinct count for %s.%s", tname, col.name)
+                est = distinct_lookup.get((tname, col.name))
+                if est is not None:
+                    col.distinct_estimate = est
 
-                # 3. Sample values for low-cardinality string columns
+        # 3. Sample values for low-cardinality string columns
+        for tname, table in tables_dict.items():
+            for col in table.columns:
                 if (
                     col.data_type in _LOW_CARDINALITY_TYPES
                     and col.distinct_estimate is not None
@@ -203,21 +215,25 @@ async def introspect(dsn: str, schema_name: str = "public") -> Result[SchemaSnap
                     except Exception:
                         logger.debug("Could not get sample values for %s.%s", tname, col.name)
 
-                # 7. Value ranges for time and numeric columns
-                if col.data_type in _TIME_TYPES or col.data_type in _NUMERIC_TYPES:
-                    try:
-                        range_row = await conn.fetchrow(
-                            f'SELECT MIN("{col.name}") AS mn, MAX("{col.name}") AS mx FROM "{tname}"'  # noqa: S608
-                        )
-                        if range_row:
-                            mn = range_row["mn"]
-                            mx = range_row["mx"]
+        # 7. Value ranges for time and numeric columns (batched per table)
+        for tname, table in tables_dict.items():
+            range_cols = [col for col in table.columns if col.data_type in _TIME_TYPES | _NUMERIC_TYPES]
+            if range_cols:
+                exprs = ", ".join(
+                    f'MIN("{c.name}") AS "{c.name}__min", MAX("{c.name}") AS "{c.name}__max"' for c in range_cols
+                )
+                try:
+                    range_row = await conn.fetchrow(f'SELECT {exprs} FROM "{tname}"')  # noqa: S608
+                    if range_row:
+                        for c in range_cols:
+                            mn = range_row.get(f"{c.name}__min")
+                            mx = range_row.get(f"{c.name}__max")
                             if mn is not None:
-                                col.min_value = _format_value(mn)
+                                c.min_value = _format_value(mn)
                             if mx is not None:
-                                col.max_value = _format_value(mx)
-                    except Exception:
-                        logger.debug("Could not get range for %s.%s", tname, col.name)
+                                c.max_value = _format_value(mx)
+                except Exception:
+                    logger.debug("Could not get ranges for table %s", tname)
 
         snapshot.tables = list(tables_dict.values())
         result.data = snapshot

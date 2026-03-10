@@ -122,11 +122,44 @@ def start(
         raise typer.Exit(1)
 
     console.print(f"[bold]Starting Lumen on port {port}...[/bold]")
+    console.print(f"[dim]Connection:[/dim] {config.active_connection}")
 
     if not no_browser:
         webbrowser.open(f"http://localhost:{port}")
 
     uvicorn.run("lumen.server:app", host="0.0.0.0", port=port, reload=False)
+
+
+@app.command()
+def status() -> None:
+    """Show the current connection and project status."""
+    config = load_config()
+    if not config.active_connection:
+        console.print("[yellow]No active connection.[/yellow] Run [bold]lumen connect[/bold] first.")
+        raise typer.Exit(0)
+
+    conn_name = config.active_connection
+    conn = config.connections.get(conn_name)
+    console.print(f"[bold]Connection:[/bold] {conn_name}")
+    if conn:
+        # Mask password in DSN for display
+        import re
+
+        display_dsn = re.sub(r"://([^:]+):([^@]+)@", r"://\1:***@", conn.dsn)
+        console.print(f"[dim]DSN:[/dim] {display_dsn}")
+        console.print(f"[dim]Schema:[/dim] {conn.schema_name}")
+
+    from lumen.theme import load_theme
+
+    proj = project_dir(conn_name)
+    theme = load_theme(conn_name)
+    theme_file = proj / "theme.json"
+    if theme_file.exists():
+        console.print(f"[dim]Theme:[/dim] {theme_file}")
+    else:
+        console.print("[dim]Theme:[/dim] default")
+    console.print(f"[dim]Locale:[/dim] {theme.locale}")
+    console.print(f"[dim]Project dir:[/dim] {proj}")
 
 
 def main() -> None:

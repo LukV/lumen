@@ -34,7 +34,8 @@ async def execute_query(
         await conn.execute(f"SET statement_timeout = '{timeout_seconds * 1000}'")
 
         start = time.monotonic()
-        rows = await conn.fetch(sql)
+        wrapped_sql = f"SELECT * FROM ({sql}) AS _lumen_q LIMIT {max_rows + 1}"
+        rows = await conn.fetch(wrapped_sql)
         elapsed_ms = int((time.monotonic() - start) * 1000)
 
         if len(rows) == 0:

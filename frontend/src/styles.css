@@ -215,6 +215,25 @@ body {
   color: var(--text-primary);
 }
 
+/* Model button in topbar */
+.topbar-model-btn {
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.topbar-model-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-border);
+}
+
 /* ═══════════════════════════════
    EMPTY STATE (HERO VIEW)
    ═══════════════════════════════ */
@@ -446,6 +465,10 @@ body {
   transition: background 0.35s, border-color 0.35s;
 }
 
+.cell--explanation .cell-body {
+  padding: 28px 32px 24px;
+}
+
 .cell-body {
   padding: 28px 32px;
 }
@@ -612,6 +635,37 @@ body {
 
 .narrative__ref--highlighted {
   background: var(--accent-border);
+}
+
+.narrative--markdown p {
+  margin: 0 0 0.6em;
+}
+
+.narrative--markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.narrative--markdown ul,
+.narrative--markdown ol {
+  margin: 0.4em 0 0.8em;
+  padding-left: 1.4em;
+}
+
+.narrative--markdown li {
+  margin-bottom: 0.25em;
+}
+
+.narrative--markdown strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.narrative--markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-warm);
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 
 /* Caveats */
@@ -925,4 +979,337 @@ body {
 
 .app-error__dismiss:hover {
   opacity: 1;
+}
+
+/* ═══════════════════════════════
+   DATA DICTIONARY PANEL
+   ═══════════════════════════════ */
+.dictionary-panel {
+  position: fixed;
+  top: var(--topbar-height);
+  height: calc(100vh - var(--topbar-height));
+  background: var(--bg-card);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  transition: right 0.3s var(--ease-out), background 0.35s, border-color 0.35s;
+  z-index: 100;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.06);
+}
+
+.dictionary-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 101;
+}
+
+.dictionary-resize-handle:hover {
+  background: var(--accent-border);
+}
+
+.dictionary-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.dictionary-header h2 {
+  font-family: var(--font-editorial);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.dictionary-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.dictionary-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.dictionary-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.dictionary-search:focus {
+  border-color: var(--accent-border);
+}
+
+.dictionary-search::placeholder {
+  color: var(--text-tertiary);
+}
+
+.dictionary-content {
+  padding: 8px 0;
+}
+
+.dictionary-table {
+  border-bottom: 1px solid var(--border);
+}
+
+.dictionary-table-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dictionary-table-header:hover {
+  background: var(--bg-card-hover);
+}
+
+.dictionary-table-header .arrow {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.dictionary-table-header .arrow.open {
+  transform: rotate(90deg);
+}
+
+.dictionary-table-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.dictionary-table-meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.dictionary-table-desc {
+  padding: 0 20px 8px 36px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.dictionary-columns {
+  padding: 0 20px 12px 36px;
+}
+
+.dictionary-column {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+
+.dictionary-column:first-child {
+  border-top: none;
+}
+
+.dictionary-column-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dictionary-column-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.dictionary-column-type {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.dictionary-column-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.dictionary-role-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dictionary-role-badge--accent {
+  color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.dictionary-role-badge--info {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
+.dictionary-role-badge--success {
+  color: var(--success);
+  background: rgba(74, 122, 111, 0.08);
+}
+
+.dictionary-role-badge--muted {
+  color: var(--text-tertiary);
+  background: var(--bg-warm);
+}
+
+.dictionary-ask-btn {
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
+  font-family: var(--font-body);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.dictionary-column:hover .dictionary-ask-btn {
+  opacity: 1;
+}
+
+.dictionary-ask-btn:hover {
+  text-decoration: underline;
+}
+
+.dictionary-overview {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dictionary-overview-link {
+  font-size: 13px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-body);
+  transition: opacity 0.15s;
+}
+
+.dictionary-overview-link:hover {
+  text-decoration: underline;
+}
+
+.dictionary-table-labels {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dictionary-table-desc-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.dictionary-table-name-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.dictionary-table-actions {
+  padding: 4px 20px 12px 36px;
+}
+
+.dictionary-ask-table-btn {
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-body);
+  transition: opacity 0.15s;
+}
+
+.dictionary-ask-table-btn:hover {
+  text-decoration: underline;
+}
+
+/* ═══════════════════════════════
+   REASONING STREAM
+   ═══════════════════════════════ */
+.reasoning-stream {
+  margin-top: 16px;
+  animation: fade-in 0.2s ease;
+}
+
+.reasoning-toggle {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: var(--font-body);
+  transition: color 0.15s;
+}
+
+.reasoning-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.reasoning-content {
+  margin-top: 8px;
+  padding: 12px 16px;
+  background: var(--bg-warm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.reasoning-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  background: var(--accent);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 0.8s ease infinite;
 }

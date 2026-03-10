@@ -74,6 +74,30 @@ PLAN_TOOL: dict[str, Any] = {
     },
 }
 
+EXPLAIN_TOOL: dict[str, Any] = {
+    "name": "explain_schema",
+    "description": "Explain the dataset, a table, or the data model to the user. No SQL needed.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "reasoning": {
+                "type": "string",
+                "description": "Internal reasoning about what the user wants to understand.",
+            },
+            "narrative": {
+                "type": "string",
+                "description": (
+                    "A clear, helpful explanation for the user. Use 3-6 sentences. "
+                    "Describe what data is available, what questions can be answered, "
+                    "and suggest concrete next steps or KPIs the user could explore."
+                ),
+            },
+        },
+        "required": ["reasoning", "narrative"],
+    },
+}
+
+
 NARRATE_TOOL: dict[str, Any] = {
     "name": "narrate_results",
     "description": "Generate a concise narrative insight from the query results, with data references.",
@@ -146,6 +170,17 @@ def build_system_prompt(
         "10. When the user asks about future trends, projections, or forecasts, include the 'whatif' "
         "parameter with technique 'trend_extrapolation'. Write baseline SQL that returns the time series "
         "(time column + measure column), and the system will wrap it with regression and projection.",
+        "11. When columns with geographic keys (nis_code, gemeente_code, geo_code) appear in the schema, "
+        "and the user asks for a geographic or per-municipality breakdown, use those columns in your SQL. "
+        "The system will auto-detect the geographic column and render a bubble map. "
+        "Do NOT try to build the map spec yourself — just return the data with the geo key column.",
+        "12. If the question is clearly unrelated to the available data (e.g. general knowledge, math, "
+        "opinions), respond with a simple SQL that returns a helpful message: "
+        "SELECT 'I can only answer questions about the data in this database.' AS message. "
+        "Never refuse silently — always return something the user can see.",
+        "13. When the user asks about the dataset, a table, the data model, or what questions are possible "
+        "(e.g. 'tell me about this dataset', 'what is in table X?', 'what KPIs can I derive?'), "
+        "use the explain_schema tool instead of plan_query. Do NOT write SQL for these questions.",
     ]
 
     # Conversation context from previous cells
@@ -175,6 +210,7 @@ def build_narrate_prompt(
     sql: str,
     result: CellResult,
     caveats: list[str] | None = None,
+    locale: str = "en",
 ) -> str:
     """Build the system prompt for Call 2 (narrate_results)."""
     data_text = format_result_for_llm(result)
@@ -201,6 +237,56 @@ def build_narrate_prompt(
         parts.append("This analysis uses projected data. Acknowledge the projection in your narrative.")
         for i, caveat in enumerate(caveats, 1):
             parts.append(f"{i}. {caveat}")
+
+    if locale != "en":
+        lang_map = {"nl": "Dutch", "fr": "French", "de": "German"}
+        lang = lang_map.get(locale, locale)
+        parts.append("")
+        parts.append(f"## Language\nWrite the narrative in {lang}.")
+
+    return "\n".join(parts)
+
+
+def build_explain_prompt(
+    question: str,
+    schema_ctx: SchemaContext,
+    locale: str = "en",
+    cells: list[Cell] | None = None,
+) -> str:
+    """Build the system prompt for explanation questions (about the dataset/schema, not data queries)."""
+    schema_xml = to_xml(schema_ctx)
+
+    parts = [
+        "You are Lumen, an expert data analyst. The user is asking about the dataset or data model, "
+        "not requesting a data query. Explain what you see in the schema and help them understand "
+        "what questions they can answer with this data.",
+        "",
+        "## Database Schema",
+        schema_xml,
+        "",
+        f"## Question: {question}",
+        "",
+        "## Instructions",
+        "1. Write a clear, helpful explanation in 3-6 sentences.",
+        "2. Describe the data domain: what it covers, what entities it tracks.",
+        "3. Mention specific tables and columns where relevant, but use plain language.",
+        "4. Suggest 2-3 concrete questions or KPIs the user could explore.",
+        "5. Be honest about limitations: what the data does NOT cover.",
+        "6. Do not write SQL or suggest chart types. This is a conversational explanation.",
+    ]
+
+    if cells:
+        conv_ctx = build_conversation_context(cells)
+        if conv_ctx:
+            parts.append("")
+            parts.append("## Conversation So Far")
+            parts.append(conv_ctx)
+
+    if locale != "en":
+        lang_map = {"nl": "Dutch", "fr": "French", "de": "German"}
+        lang = lang_map.get(locale, locale)
+        parts.append("")
+        parts.append(f"## Language\nWrite the explanation in {lang}.")
 
     return "\n".join(parts)
 

@@ -2,14 +2,41 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Cell } from "./types/cell";
 import { API_BASE } from "./config";
 import { consumeSSE } from "./utils/sse";
+import { setLocale, t } from "./locales";
 import CellView from "./components/CellView";
+import DataDictionary from "./components/DataDictionary";
 import InputBar from "./components/InputBar";
+import ReasoningStream from "./components/ReasoningStream";
 import StageIndicator from "./components/StageIndicator";
 
 interface HealthData {
   ok: boolean;
   connection_name?: string;
   database?: string;
+}
+
+interface SchemaTable {
+  name: string;
+  row_count: number;
+  comment?: string | null;
+  columns: {
+    name: string;
+    data_type: string;
+    role: string;
+    is_primary_key?: boolean;
+    comment?: string | null;
+    distinct_estimate?: number | null;
+    sample_values?: string[];
+    suggested_agg?: string | null;
+  }[];
+}
+
+interface ThemeData {
+  app_name: string;
+  locale: string;
+  logo_path: string | null;
+  custom_css: string | null;
+  css_vars: Record<string, string>;
 }
 
 function pickRandom<T>(arr: T[], n: number): T[] {
@@ -34,6 +61,11 @@ export default function App() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [health, setHealth] = useState<HealthData | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [schemaTables, setSchemaTables] = useState<SchemaTable[]>([]);
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  const [tableDescriptions, setTableDescriptions] = useState<Record<string, string>>({});
+  const [reasoningText, setReasoningText] = useState("");
+  const [appName, setAppName] = useState("Lumen");
   const resultsScrollRef = useRef<HTMLDivElement>(null);
 
   const lastCellId = cells.length > 0 ? cells[cells.length - 1].id : null;
@@ -84,6 +116,52 @@ export default function App() {
       .then((res) => res.json())
       .then((data: HealthData) => setHealth(data))
       .catch(() => setHealth(null));
+
+    // Fetch theme config
+    fetch(`${API_BASE}/api/theme`)
+      .then((res) => res.json())
+      .then((data: ThemeData) => {
+        setAppName(data.app_name);
+        setLocale(data.locale);
+        // Load custom font CSS if configured
+        if (data.custom_css) {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = data.custom_css;
+          document.head.appendChild(link);
+        }
+        // Apply CSS vars from theme
+        const root = document.documentElement;
+        for (const [key, value] of Object.entries(data.css_vars)) {
+          root.style.setProperty(key, value);
+        }
+      })
+      .catch(() => {});
+
+    // Fetch schema for dictionary
+    fetch(`${API_BASE}/api/schema`)
+      .then((res) => res.json())
+      .then((data: { schema?: { tables?: SchemaTable[] } }) => {
+        if (data.schema?.tables) {
+          setSchemaTables(data.schema.tables);
+        }
+      })
+      .catch(() => {});
+
+    // Fetch table descriptions
+    const fetchDescriptions = () => {
+      fetch(`${API_BASE}/api/descriptions`)
+        .then((res) => res.json())
+        .then((data: { descriptions: Record<string, string>; generating: boolean }) => {
+          if (Object.keys(data.descriptions).length > 0) {
+            setTableDescriptions(data.descriptions);
+          } else if (data.generating) {
+            setTimeout(fetchDescriptions, 4000);
+          }
+        })
+        .catch(() => {});
+    };
+    fetchDescriptions();
   }, []);
 
   // Health polling every 30s
@@ -122,6 +200,7 @@ export default function App() {
       setIsProcessing(true);
       setError(null);
       setCurrentStage("thinking");
+      setReasoningText("");
 
       try {
         const body: { question: string; parent_cell_id?: string } = {
@@ -146,11 +225,13 @@ export default function App() {
           onCell: (data) => {
             setCells((prev) => [...prev, data as Cell]);
             setCurrentStage(null);
+            setReasoningText("");
           },
           onError: (message) => {
             setError(message);
             setCurrentStage(null);
           },
+          onReasoning: (text) => setReasoningText((prev) => prev + text),
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -178,9 +259,17 @@ export default function App() {
             <rect x="36" y="18" width="3" height="14" rx="1.5" fill="var(--logo-fill)" opacity="0.35" />
             <line x1="2" y1="33.5" x2="40" y2="33.5" stroke="var(--logo-fill)" strokeWidth="1" opacity="0.3" />
           </svg>
-          <span className="topbar-wordmark">Lumen</span>
+          <span className="topbar-wordmark">{appName}</span>
         </div>
         <div className="topbar-right">
+          {schemaTables.length > 0 && (
+            <button
+              className="topbar-model-btn"
+              onClick={() => setDictionaryOpen(!dictionaryOpen)}
+            >
+              {t("dictionary.label")}
+            </button>
+          )}
           {health !== null && (
             <div className="conn-indicator">
               <span
@@ -227,13 +316,11 @@ export default function App() {
       {/* Empty state (hero view) */}
       {!showResults && (
         <div className="view-empty">
-          <h1 className="hero-title">
-            From question to insight
-            <br />
-            in one conversation.
+          <h1 className="hero-title" style={{ whiteSpace: "pre-line" }}>
+            {t("hero.title")}
           </h1>
           <p className="hero-sub">
-            Your thinking partner for reproducible data exploration.
+            {t("hero.subtitle")}
           </p>
           <InputBar
             variant="hero"
@@ -272,6 +359,11 @@ export default function App() {
                 />
               ))}
 
+              {/* Reasoning stream */}
+              {reasoningText && isProcessing && (
+                <ReasoningStream text={reasoningText} isStreaming={!!currentStage} />
+              )}
+
               {/* Stage indicator */}
               {currentStage && <StageIndicator stage={currentStage} />}
 
@@ -304,6 +396,18 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Data Dictionary panel */}
+      <DataDictionary
+        tables={schemaTables}
+        tableDescriptions={tableDescriptions}
+        isOpen={dictionaryOpen}
+        onClose={() => setDictionaryOpen(false)}
+        onAskAbout={(q) => {
+          setDictionaryOpen(false);
+          handleAsk(q);
+        }}
+      />
     </div>
   );
 }

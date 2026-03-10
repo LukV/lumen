@@ -28,6 +28,7 @@ Everything runs on your machine. Data never leaves localhost — the only extern
 git clone https://github.com/LukV/lumen.git
 cd lumen
 uv sync --all-extras
+source ./.venv/bin/activate
 ```
 
 Set your API key:
@@ -50,6 +51,20 @@ Use `--name` to manage multiple connections:
 
 ```bash
 uv run lumen connect "postgresql://..." --name staging
+```
+
+Check the active connection at any time:
+
+```bash
+lumen status
+```
+
+```
+Connection: default
+DSN: postgresql://user:***@localhost:5432/mydb
+Schema: public
+Theme: default
+Project dir: /Users/lukv/.lumen/projects/default
 ```
 
 ### 2. Add documentation (optional)
@@ -86,13 +101,65 @@ customers,tier,Account tier based on annual spend
 
 Re-run `lumen connect` to pick up documentation changes. Lumen detects schema staleness automatically.
 
-### 3. Launch the UI
+### 3. Configure theming and locale (optional)
+
+Create a `theme.json` in your project folder to customize branding, colors, fonts, and language:
+
+```json
+// ~/.lumen/projects/<connection-name>/theme.json
+{
+  "app_name": "My Analytics",
+  "locale": "nl",
+  "colors": {
+    "primary": "#2B979D",
+    "secondary": "#CC5621",
+    "accent": "#5D6009"
+  },
+  "fonts": {
+    "body": "Inter",
+    "editorial": "Source Serif 4"
+  }
+}
+```
+
+All fields are optional — omitted values fall back to defaults.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `app_name` | `"Lumen"` | Displayed in the topbar |
+| `locale` | `"en"` | UI language (`en`, `nl`). Also controls the language of generated narratives |
+| `logo_path` | `null` | Path to a logo image (served as a static asset) |
+| `colors.primary` | `"#4A2D4F"` | Primary accent color (buttons, highlights, charts) |
+| `colors.secondary` | `"#C2876E"` | Secondary chart color |
+| `colors.accent` | `"#6B8F8A"` | Third chart color |
+| `colors.palette` | derived | Full chart color palette (list of 3-6 hex strings). When omitted, derived from primary/secondary/accent |
+| `fonts.body` | `"DM Sans"` | UI and chart label font |
+| `fonts.editorial` | `"Source Serif 4"` | Narrative and heading font |
+| `fonts.mono` | `"JetBrains Mono"` | Code font |
+| `fonts.custom_css` | `null` | URL to a CSS file with `@font-face` declarations for custom fonts |
+
+The theme is loaded on server start and served to the frontend via `GET /api/theme`. Colors propagate to CSS custom properties and Vega-Lite chart configs automatically — no frontend rebuild needed.
+
+A global fallback theme can be placed at `~/.lumen/theme.json`. The resolution order is: project theme → global theme → built-in defaults.
+
+#### Supported locales
+
+| Code | Language |
+|------|----------|
+| `en` | English (default) |
+| `nl` | Dutch |
+
+The locale setting affects two things:
+1. **UI chrome** — all labels, buttons, placeholders, and stage indicators are translated.
+2. **Narratives** — the LLM writes its data insights in the configured language.
+
+### 4. Launch the UI
 
 ```bash
 uv run lumen start
 ```
 
-This opens Lumen in your browser at `http://localhost:8000`. Start asking questions.
+This opens Lumen in your browser at `http://localhost:8000` and prints the active connection. Start asking questions.
 
 Use `--no-browser` to suppress the automatic browser launch, or `--port` to change the port:
 

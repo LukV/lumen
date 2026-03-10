@@ -3,6 +3,7 @@ export interface SSEHandlers {
   onStage?: (stage: string) => void;
   onCell?: (data: unknown) => void;
   onError?: (message: string) => void;
+  onReasoning?: (text: string) => void;
 }
 
 export async function consumeSSE(
@@ -42,6 +43,8 @@ export async function consumeSSE(
               handlers.onCell?.(data);
             } else if (eventType === "error") {
               handlers.onError?.(data.message);
+            } else if (eventType === "reasoning") {
+              handlers.onReasoning?.(data.text);
             }
           } catch (e) {
             console.error("[SSE] parse error:", e, eventData);

@@ -1,8 +1,11 @@
-"""Lumen Vega-Lite theme."""
+"""Lumen Vega-Lite theme — config-driven palette and fonts."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from lumen.theme import ThemeConfig
 
 LUMEN_PALETTE = [
     "#4A2D4F",
@@ -67,12 +70,18 @@ LUMEN_THEME: dict[str, Any] = {
 }
 
 
-def apply_theme(spec: dict[str, Any]) -> dict[str, Any]:
-    """Merge the Lumen theme config into a Vega-Lite spec."""
+def apply_theme(spec: dict[str, Any], theme: ThemeConfig | None = None) -> dict[str, Any]:
+    """Merge the Lumen theme config into a Vega-Lite spec.
+
+    When a ThemeConfig is provided, palette and fonts are derived from it.
+    Otherwise, uses the hardcoded Lumen defaults for backward compatibility.
+    """
+    base_config = _build_config(theme)
+
     themed: dict[str, Any] = dict(spec)
     # Merge config
     existing_config: dict[str, Any] = dict(themed.get("config", {}))
-    for key, value in LUMEN_THEME["config"].items():
+    for key, value in base_config.items():
         if key not in existing_config:
             existing_config[key] = value
         elif isinstance(value, dict) and isinstance(existing_config[key], dict):
@@ -86,3 +95,48 @@ def apply_theme(spec: dict[str, Any]) -> dict[str, Any]:
         themed["$schema"] = "https://vega.github.io/schema/vega-lite/v5.json"
 
     return themed
+
+
+def _build_config(theme: ThemeConfig | None) -> dict[str, Any]:
+    """Build the Vega-Lite config dict from a theme or defaults."""
+    if theme is None:
+        return dict(LUMEN_THEME["config"])
+
+    palette = theme.colors.resolved_palette()
+    font = f"{theme.fonts.body}, system-ui, sans-serif"
+
+    return {
+        "font": font,
+        "axis": {
+            "labelFont": font,
+            "titleFont": font,
+            "labelFontSize": 11,
+            "titleFontSize": 12,
+            "titleFontWeight": 600,
+            "gridDash": [3, 3],
+            "gridColor": "#E8E5DF",
+            "domainColor": "#CCCAC5",
+            "tickColor": "#CCCAC5",
+            "labelLimit": 150,
+            "titlePadding": 12,
+        },
+        "legend": {
+            "labelFont": font,
+            "titleFont": font,
+            "labelFontSize": 11,
+            "titleFontSize": 12,
+        },
+        "title": {
+            "font": font,
+            "fontSize": 14,
+            "fontWeight": 600,
+        },
+        "bar": {"cornerRadiusEnd": 3},
+        "line": {"strokeWidth": 2, "point": {"size": 40}},
+        "point": {"size": 60, "opacity": 0.7},
+        "area": {"opacity": 0.7, "line": True},
+        "range": {"category": palette},
+        "view": {"strokeWidth": 0},
+        "padding": {"row": 10, "column": 10},
+        "background": "transparent",
+    }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Cell } from "../types/cell";
 import { API_BASE } from "../config";
+import { t } from "../locales";
 import { consumeSSE } from "../utils/sse";
 import StageIndicator from "./StageIndicator";
 
@@ -55,9 +56,9 @@ export default function CodeView({ cell, onCellUpdate }: CodeViewProps) {
   };
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "sql", label: "SQL" },
-    { key: "chart", label: "Chart Spec" },
-    { key: "reasoning", label: "Reasoning" },
+    { key: "sql", label: t("code.sql") },
+    { key: "chart", label: t("code.chart") },
+    { key: "reasoning", label: t("code.reasoning") },
   ];
 
   return (
@@ -90,7 +91,7 @@ export default function CodeView({ cell, onCellUpdate }: CodeViewProps) {
               disabled={!sqlChanged || isRunning}
               className="btn-code-action primary"
             >
-              Run
+              {t("code.run")}
             </button>
             {runStage && <StageIndicator stage={runStage} />}
             {runError && (

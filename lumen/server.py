@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -29,10 +30,24 @@ from lumen.notebook.notebook import Notebook
 from lumen.notebook.store import get_store
 from lumen.schema.cache import load_cached
 from lumen.schema.context import SchemaContext
+from lumen.schema.describer import (
+    DescriptionsCache,
+    generate_descriptions,
+    load_cached_descriptions,
+    save_descriptions_cache,
+)
+from lumen.theme import load_theme, theme_to_css_vars
 
 logger = logging.getLogger("lumen.server")
 
-app = FastAPI(title="Lumen", version="0.2.0")
+
+@asynccontextmanager
+async def lifespan(_app_instance: FastAPI) -> AsyncGenerator[None]:
+    await _startup_logic()
+    yield
+
+
+app = FastAPI(title="Lumen", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,6 +63,10 @@ _schema_ctx: SchemaContext | None = None
 # Suggestion questions
 _suggestions: list[str] = []
 _suggestions_generating: bool = False
+
+# Table descriptions
+_table_descriptions: dict[str, str] = {}
+_descriptions_generating: bool = False
 
 
 async def _get_schema_ctx() -> SchemaContext | None:
@@ -90,8 +109,27 @@ async def _generate_suggestions_bg(schema_ctx: SchemaContext, config: LumenConfi
         _suggestions_generating = False
 
 
-@app.on_event("startup")
-async def _startup() -> None:
+async def _generate_descriptions_bg(schema_ctx: SchemaContext, config: LumenConfig) -> None:
+    """Generate table descriptions in background thread and cache on success."""
+    global _table_descriptions, _descriptions_generating  # noqa: PLW0603
+    _descriptions_generating = True
+    try:
+        result = await asyncio.to_thread(generate_descriptions, schema_ctx, config)
+        if result.ok and result.data:
+            _table_descriptions = result.data
+            if config.active_connection:
+                cache = DescriptionsCache(schema_hash=schema_ctx.hash, descriptions=result.data)
+                save_descriptions_cache(config.active_connection, cache)
+                logger.info("Generated and cached %d table descriptions", len(result.data))
+        else:
+            logger.warning("Description generation failed: %s", result.diagnostics)
+    except Exception:
+        logger.exception("Error generating descriptions")
+    finally:
+        _descriptions_generating = False
+
+
+async def _startup_logic() -> None:
     """Load the most recent notebook for the active connection on startup."""
     global _suggestions  # noqa: PLW0603
     config = load_config()
@@ -109,7 +147,7 @@ async def _startup() -> None:
         store.set_notebook(nb)
         logger.info("Created new notebook %s for connection %s", nb.id, config.active_connection)
 
-    # Load or generate suggestions
+    # Load or generate suggestions and descriptions
     schema_ctx = await load_cached(config.active_connection)
     if schema_ctx:
         cached = load_cached_suggestions(config.active_connection)
@@ -118,6 +156,13 @@ async def _startup() -> None:
             logger.info("Loaded %d cached suggestions", len(_suggestions))
         else:
             asyncio.create_task(_generate_suggestions_bg(schema_ctx, config))
+
+        desc_cached = load_cached_descriptions(config.active_connection)
+        if desc_cached and desc_cached.schema_hash == schema_ctx.hash:
+            _table_descriptions = desc_cached.descriptions
+            logger.info("Loaded %d cached table descriptions", len(_table_descriptions))
+        else:
+            asyncio.create_task(_generate_descriptions_bg(schema_ctx, config))
 
 
 @app.get("/api/health")
@@ -136,12 +181,30 @@ async def get_suggestions() -> dict[str, Any]:
     return {"suggestions": _suggestions, "generating": _suggestions_generating}
 
 
+@app.get("/api/descriptions")
+async def get_descriptions() -> dict[str, Any]:
+    return {"descriptions": _table_descriptions, "generating": _descriptions_generating}
+
+
 @app.get("/api/schema")
 async def get_schema() -> Any:
     ctx = await _get_schema_ctx()
     if ctx is None:
         return JSONResponse(status_code=404, content={"error": "No schema loaded. Run `lumen connect` first."})
     return ctx.model_dump(by_alias=True)
+
+
+@app.get("/api/theme")
+async def get_theme() -> dict[str, Any]:
+    config = load_config()
+    theme = load_theme(config.active_connection)
+    return {
+        "app_name": theme.app_name,
+        "locale": theme.locale,
+        "logo_path": theme.logo_path,
+        "custom_css": theme.fonts.custom_css,
+        "css_vars": theme_to_css_vars(theme),
+    }
 
 
 @app.get("/api/config")
