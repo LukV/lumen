@@ -1,0 +1,85 @@
+[project]
+name = "lumen"
+version = "0.1.0"
+description = "Governed AI Analytics"
+readme = "README.md"
+authors = [
+    { name = "Luk Verhelst", email = "luk@lumen-analytics.com" },
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
+
+dependencies = [
+    "anthropic>=0.103.1",
+    "asyncpg>=0.31.0",
+    "duckdb>=1.5.2",
+    "fastapi>=0.136.1",
+    "pglast>=7.13",
+    "pydantic>=2.13.4",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+    "sse-starlette>=3.4.4",
+    "typer>=0.25.1",
+    "uvicorn>=0.47.0",
+]
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.16.2",
+    "mypy>=2.1.0",
+    "ruff>=0.15.13",
+]
+
+[project.scripts]
+lumen = "lumen.cli:main"
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "SIM"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pglast", "pglast.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["yaml"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["duckdb", "duckdb.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+version_scheme = "semver"
+tag_format = "v$version"
+changelog_file = "CHANGELOG.md"
+update_changelog_on_bump = true
+# Stay on 0.x until the production-readiness work is complete;
+# breaking changes during hardening should not bump us to 1.x prematurely.
+major_version_zero = true
+version_files = [
+    "lumen/server/app.py:version=",
+    "pyproject.toml:^version",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
