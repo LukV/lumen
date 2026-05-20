@@ -1,6 +1,6 @@
 [project]
 name = "lumen"
-version = "0.1.0"
+version = "0.2.0"
 description = "Governed AI Analytics"
 readme = "README.md"
 authors = [
@@ -67,7 +67,7 @@ asyncio_mode = "auto"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.1.0"
+version = "0.2.0"
 version_scheme = "semver"
 tag_format = "v$version"
 changelog_file = "CHANGELOG.md"
