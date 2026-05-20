@@ -1,0 +1,206 @@
+import { useRef, useState } from "react";
+import type { Cell } from "../types/cell";
+import { API_BASE } from "../config";
+import { t } from "../locales";
+import ChartRenderer from "./ChartRenderer";
+import CodeView from "./CodeView";
+import NarrativeView from "./NarrativeView";
+
+interface CellViewProps {
+  cell: Cell;
+  theme: "light" | "dark";
+  onCellUpdate: (updated: Cell) => void;
+  onCellDelete: (cellId: string) => void;
+}
+
+export default function CellView({ cell, theme, onCellUpdate, onCellDelete }: CellViewProps) {
+  const [showCode, setShowCode] = useState(false);
+  const [hoveredDatum, setHoveredDatum] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  const hasErrors = cell.result?.diagnostics?.some(
+    (d) => d.severity === "error"
+  );
+  const hasData = cell.result && cell.result.data.length > 0;
+  const emptyResult =
+    cell.result && cell.result.row_count === 0 && !hasErrors;
+
+  const displayTitle = cell.title || cell.question;
+
+  const startEditing = () => {
+    setTitleDraft(displayTitle);
+    setEditingTitle(true);
+    setTimeout(() => titleInputRef.current?.select(), 0);
+  };
+
+  const commitTitle = async () => {
+    setEditingTitle(false);
+    const newTitle = titleDraft.trim();
+    if (newTitle === cell.question) {
+      // Reset to default (empty title means use question)
+      if (cell.title === "") return;
+      try {
+        await fetch(`${API_BASE}/api/cells/${cell.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "" }),
+        });
+        onCellUpdate({ ...cell, title: "" });
+      } catch { /* ignore */ }
+      return;
+    }
+    if (newTitle && newTitle !== cell.title) {
+      try {
+        await fetch(`${API_BASE}/api/cells/${cell.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newTitle }),
+        });
+        onCellUpdate({ ...cell, title: newTitle });
+      } catch { /* ignore */ }
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitTitle();
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
+  };
+
+  const isExplanation = cell.cell_type === "explanation";
+
+  return (
+    <div className={`cell ${isExplanation ? "cell--explanation" : ""}`}>
+      {/* Cell body */}
+      <div className="cell-body">
+        {/* Title header */}
+        <div className="cell__header">
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              className="cell__title-input"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={handleTitleKeyDown}
+            />
+          ) : (
+            <h3
+              className="cell__question"
+              onDoubleClick={startEditing}
+              title="Double-click to edit title"
+            >
+              {displayTitle}
+            </h3>
+          )}
+          {cell.sql?.edited_by_user && (
+            <span className="cell__badge">{t("cell.edited")}</span>
+          )}
+          <button
+            className="cell__delete-btn"
+            onClick={() => onCellDelete(cell.id)}
+            aria-label="Remove cell"
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Analysis-only: error, empty, chart */}
+        {!isExplanation && hasErrors && (
+          <div className="error-banner">
+            <div className="error-banner__content">
+              {cell.result?.diagnostics
+                ?.filter((d) => d.severity === "error")
+                .map((d, i) => (
+                  <div key={i}>
+                    {d.message}
+                    {d.hint && (
+                      <span className="error-banner__hint">Hint: {d.hint}</span>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {!isExplanation && emptyResult && (
+          <div className="cell__empty-results">
+            Query returned no results. Try broadening your filters.
+          </div>
+        )}
+
+        {!isExplanation && cell.chart && hasData && (
+          <div className="cell__chart">
+            <ChartRenderer
+              spec={cell.chart.spec}
+              data={cell.result!.data}
+              theme={theme}
+              onHoverData={setHoveredDatum}
+            />
+          </div>
+        )}
+
+        {/* Narrative */}
+        {cell.narrative && (
+          <div className="cell-insight">
+            <NarrativeView
+              text={cell.narrative.text}
+              dataReferences={cell.narrative.data_references}
+              highlightedDatum={hoveredDatum}
+            />
+          </div>
+        )}
+
+      </div>
+
+      {/* Footer strip (analysis only) */}
+      {!isExplanation && cell.sql && (
+        <div className="cell-footer">
+          <div className="cell-footer-left">
+            <button
+              className="cell-link"
+              onClick={() => setShowCode(!showCode)}
+            >
+              <span className={`arrow ${showCode ? "open" : ""}`}>&#9656;</span>
+              {showCode ? "Hide code" : t("cell.code")}
+            </button>
+          </div>
+          <div className="cell-meta-strip">
+            {cell.result && (
+              <>
+                <span>{cell.result.row_count} {t("cell.rows")}</span>
+                <span className="sep" />
+                <span>{cell.result.execution_time_ms}ms</span>
+              </>
+            )}
+            {cell.metadata.model && (
+              <>
+                {cell.result && <span className="sep" />}
+                <span>{cell.metadata.model}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Code drawer (analysis only) */}
+      {!isExplanation && cell.sql && (
+        <div className={`code-drawer ${showCode ? "open" : ""}`}>
+          <CodeView cell={cell} onCellUpdate={onCellUpdate} />
+        </div>
+      )}
+    </div>
+  );
+}

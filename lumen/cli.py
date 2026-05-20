@@ -158,7 +158,7 @@ def start(
     if not no_browser:
         webbrowser.open(f"http://localhost:{port}")
 
-    uvicorn.run("lumen.server:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("lumen.server.app:app", host="0.0.0.0", port=port, reload=False)
 
 
 @app.command()

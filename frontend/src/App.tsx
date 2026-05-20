@@ -1,0 +1,447 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Cell } from "./types/cell";
+import { API_BASE } from "./config";
+import { consumeSSE } from "./utils/sse";
+import { setLocale, t } from "./locales";
+import CellView from "./components/CellView";
+import DataDictionary from "./components/DataDictionary";
+import InputBar from "./components/InputBar";
+import ReasoningStream from "./components/ReasoningStream";
+import StageIndicator from "./components/StageIndicator";
+
+interface HealthData {
+  ok: boolean;
+  connection_name?: string;
+  database?: string;
+}
+
+interface SchemaTable {
+  name: string;
+  row_count: number;
+  comment?: string | null;
+  columns: {
+    name: string;
+    data_type: string;
+    role: string;
+    is_primary_key?: boolean;
+    comment?: string | null;
+    distinct_estimate?: number | null;
+    sample_values?: string[];
+    suggested_agg?: string | null;
+  }[];
+}
+
+interface ThemeData {
+  app_name: string;
+  locale: string;
+  logo_path: string | null;
+  custom_css: string | null;
+  css_vars: Record<string, string>;
+}
+
+function pickRandom<T>(arr: T[], n: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n);
+}
+
+type Theme = "light" | "dark";
+
+function getInitialTheme(): Theme {
+  const stored = localStorage.getItem("lumen-theme");
+  if (stored === "light" || stored === "dark") return stored;
+  if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+  return "light";
+}
+
+export default function App() {
+  const [cells, setCells] = useState<Cell[]>([]);
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [schemaTables, setSchemaTables] = useState<SchemaTable[]>([]);
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  const [tableDescriptions, setTableDescriptions] = useState<Record<string, string>>({});
+  const [reasoningText, setReasoningText] = useState("");
+  const [appName, setAppName] = useState("Lumen");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const resultsScrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const lastCellId = cells.length > 0 ? cells[cells.length - 1].id : null;
+  const showResults = cells.length > 0 || isProcessing;
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("lumen-theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
+
+  // Load notebook, suggestions, and health on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/api/notebook`)
+      .then((res) => res.json())
+      .then((data: Cell[]) => setCells(data))
+      .catch(() => setConnectionError("Unable to connect to Lumen — check that the server is running"));
+
+    const fetchSuggestions = () => {
+      fetch(`${API_BASE}/api/suggestions`)
+        .then((res) => res.json())
+        .then((data: { suggestions: string[]; generating: boolean }) => {
+          if (data.suggestions.length > 0) {
+            setSuggestions(pickRandom(data.suggestions, 5));
+          } else if (data.generating) {
+            setTimeout(() => {
+              fetch(`${API_BASE}/api/suggestions`)
+                .then((res) => res.json())
+                .then((retry: { suggestions: string[] }) => {
+                  if (retry.suggestions.length > 0) {
+                    setSuggestions(pickRandom(retry.suggestions, 5));
+                  }
+                })
+                .catch(() => console.warn("Failed to fetch suggestions"));
+            }, 3000);
+          }
+        })
+        .catch(() => console.warn("Failed to fetch suggestions"));
+    };
+    fetchSuggestions();
+
+    fetch(`${API_BASE}/api/health`)
+      .then((res) => res.json())
+      .then((data: HealthData) => setHealth(data))
+      .catch(() => {
+        setHealth(null);
+        setConnectionError("Unable to connect to Lumen — check that the server is running");
+      });
+
+    fetch(`${API_BASE}/api/theme`)
+      .then((res) => res.json())
+      .then((data: ThemeData) => {
+        setAppName(data.app_name);
+        setLocale(data.locale);
+        if (data.custom_css) {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = data.custom_css;
+          document.head.appendChild(link);
+        }
+        const root = document.documentElement;
+        for (const [key, value] of Object.entries(data.css_vars)) {
+          root.style.setProperty(key, value);
+        }
+      })
+      .catch(() => setConnectionError("Unable to connect to Lumen — check that the server is running"));
+
+    fetch(`${API_BASE}/api/schema`)
+      .then((res) => res.json())
+      .then((data: { schema?: { tables?: SchemaTable[] } }) => {
+        if (data.schema?.tables) {
+          setSchemaTables(data.schema.tables);
+        }
+      })
+      .catch(() => console.warn("Failed to fetch schema"));
+
+    const fetchDescriptions = () => {
+      fetch(`${API_BASE}/api/descriptions`)
+        .then((res) => res.json())
+        .then((data: { descriptions: Record<string, string>; generating: boolean }) => {
+          if (Object.keys(data.descriptions).length > 0) {
+            setTableDescriptions(data.descriptions);
+          } else if (data.generating) {
+            setTimeout(fetchDescriptions, 4000);
+          }
+        })
+        .catch(() => console.warn("Failed to fetch descriptions"));
+    };
+    fetchDescriptions();
+  }, []);
+
+  // Health polling every 30s — clears connection error on recovery
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch(`${API_BASE}/api/health`)
+        .then((res) => res.json())
+        .then((data: HealthData) => {
+          setHealth(data);
+          if (data.ok && connectionError) {
+            setConnectionError(null);
+          }
+        })
+        .catch(() => {
+          setHealth(null);
+          setConnectionError("Unable to connect to Lumen — check that the server is running");
+        });
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [connectionError]);
+
+  // Scroll to bottom when processing
+  useEffect(() => {
+    if (isProcessing && resultsScrollRef.current) {
+      resultsScrollRef.current.scrollTop = resultsScrollRef.current.scrollHeight;
+    }
+  }, [cells, currentStage, isProcessing]);
+
+  const handleCellUpdate = (updated: Cell) => {
+    setCells((prev) =>
+      prev.map((c) => (c.id === updated.id ? updated : c))
+    );
+  };
+
+  const handleCellDelete = async (cellId: string) => {
+    try {
+      await fetch(`${API_BASE}/api/cells/${cellId}`, { method: "DELETE" });
+      setCells((prev) => prev.filter((c) => c.id !== cellId));
+    } catch { /* ignore */ }
+  };
+
+  // Abort active SSE stream on unmount
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
+  const handleAsk = useCallback(
+    async (question: string) => {
+      // Abort any in-flight request
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setIsProcessing(true);
+      setError(null);
+      setCurrentStage("thinking");
+      setReasoningText("");
+
+      try {
+        const body: { question: string; parent_cell_id?: string } = {
+          question,
+        };
+        if (lastCellId) {
+          body.parent_cell_id = lastCellId;
+        }
+
+        const response = await fetch(`${API_BASE}/api/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        await consumeSSE(response, {
+          onStage: (stage) => setCurrentStage(stage),
+          onCell: (data) => {
+            setCells((prev) => [...prev, data as Cell]);
+            setCurrentStage(null);
+            setReasoningText("");
+          },
+          onError: (message) => {
+            setError(message);
+            setCurrentStage(null);
+          },
+          onReasoning: (text) => setReasoningText((prev) => prev + text),
+        }, controller.signal);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Unknown error");
+        setCurrentStage(null);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [lastCellId]
+  );
+
+  const isConnected = health?.ok === true;
+  const connectionLabel = health?.database || health?.connection_name;
+
+  return (
+    <div className="app">
+      {/* Topbar */}
+      <header className="topbar">
+        <div className="topbar-left">
+          <svg width="26" height="26" viewBox="0 0 40 40" fill="none">
+            <rect x="4" y="8" width="3" height="24" rx="1.5" fill="var(--logo-fill)" />
+            <rect x="12" y="14" width="3" height="18" rx="1.5" fill="var(--logo-fill)" opacity="0.7" />
+            <rect x="20" y="6" width="3" height="26" rx="1.5" fill="var(--logo-fill)" opacity="0.85" />
+            <rect x="28" y="11" width="3" height="21" rx="1.5" fill="var(--logo-fill)" opacity="0.55" />
+            <rect x="36" y="18" width="3" height="14" rx="1.5" fill="var(--logo-fill)" opacity="0.35" />
+            <line x1="2" y1="33.5" x2="40" y2="33.5" stroke="var(--logo-fill)" strokeWidth="1" opacity="0.3" />
+          </svg>
+          <span className="topbar-wordmark">{appName}</span>
+        </div>
+        <div className="topbar-right">
+          {schemaTables.length > 0 && (
+            <button
+              className="topbar-model-btn"
+              onClick={() => setDictionaryOpen(!dictionaryOpen)}
+            >
+              {t("dictionary.label")}
+            </button>
+          )}
+          {health !== null && (
+            <div className="conn-indicator">
+              <span
+                className={`conn-dot ${isConnected ? "conn-dot--connected" : "conn-dot--disconnected"}`}
+              />
+              {isConnected
+                ? connectionLabel
+                  ? connectionLabel
+                  : "Connected"
+                : "Not connected"}
+            </div>
+          )}
+          <button
+            className="theme-toggle"
+            onClick={toggleTheme}
+            title="Toggle theme"
+            aria-label="Toggle theme"
+          >
+            {theme === "light" ? (
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M13.5 9.2A5.5 5.5 0 016.8 2.5 6 6 0 1013.5 9.2z"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.3" />
+                <path
+                  d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
+      </header>
+
+      {/* Connection error banner */}
+      {connectionError && (
+        <div className="connection-error-banner">
+          <span>{connectionError}</span>
+          <button
+            onClick={() => {
+              setConnectionError(null);
+              window.location.reload();
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Empty state (hero view) */}
+      {!showResults && (
+        <div className="view-empty">
+          <h1 className="hero-title" style={{ whiteSpace: "pre-line" }}>
+            {t("hero.title")}
+          </h1>
+          <p className="hero-sub">
+            {t("hero.subtitle")}
+          </p>
+          <InputBar
+            variant="hero"
+            onAsk={handleAsk}
+            disabled={isProcessing || !!connectionError}
+            parentCellId={lastCellId}
+          />
+          {suggestions.length > 0 && (
+            <div className="sample-prompts">
+              {suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  className="sample-chip"
+                  onClick={() => handleAsk(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Results state */}
+      {showResults && (
+        <div className="view-results">
+          <div className="results-scroll" ref={resultsScrollRef}>
+            <div className="results-inner">
+              {cells.map((cell) => (
+                <CellView
+                  key={cell.id}
+                  cell={cell}
+                  theme={theme}
+                  onCellUpdate={handleCellUpdate}
+                  onCellDelete={handleCellDelete}
+                />
+              ))}
+
+              {/* Stage indicator */}
+              {currentStage && <StageIndicator stage={currentStage} />}
+
+              {/* Reasoning stream (below stage indicator) */}
+              {reasoningText && isProcessing && (
+                <ReasoningStream text={reasoningText} isStreaming={!!currentStage} />
+              )}
+
+              {/* Error */}
+              {error && (
+                <div className="app-error">
+                  <span className="app-error__text">{error}</span>
+                  <button
+                    className="app-error__dismiss"
+                    onClick={() => setError(null)}
+                    aria-label="Dismiss error"
+                  >
+                    &times;
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom input bar */}
+          <div className="bottom-input-bar">
+            <div className="bottom-input-inner">
+              <InputBar
+                variant="compact"
+                onAsk={handleAsk}
+                disabled={isProcessing || !!connectionError}
+                parentCellId={lastCellId}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Data Dictionary panel */}
+      <DataDictionary
+        tables={schemaTables}
+        tableDescriptions={tableDescriptions}
+        isOpen={dictionaryOpen}
+        onClose={() => setDictionaryOpen(false)}
+        onAskAbout={(q) => {
+          setDictionaryOpen(false);
+          handleAsk(q);
+        }}
+      />
+    </div>
+  );
+}

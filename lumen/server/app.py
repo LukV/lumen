@@ -29,7 +29,12 @@ from lumen.schema.describer import (
     load_cached_descriptions,
     save_descriptions_cache,
 )
+from lumen.server.routes.ask import router as ask_router
+from lumen.server.routes.config import router as config_router
 from lumen.server.routes.health import router as health_router
+from lumen.server.routes.notebook import router as notebook_router
+from lumen.server.routes.schema import router as schema_router
+from lumen.server.routes.suggestions import router as suggestions_router
 from lumen.server.state import AppState
 
 logger = logging.getLogger("lumen.server")
@@ -169,6 +174,11 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router, prefix="/api")
+    app.include_router(suggestions_router, prefix="/api")
+    app.include_router(schema_router, prefix="/api")
+    app.include_router(config_router, prefix="/api")
+    app.include_router(notebook_router, prefix="/api")
+    app.include_router(ask_router, prefix="/api")
 
     frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
     if frontend_dist.exists():
